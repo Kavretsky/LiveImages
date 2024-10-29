@@ -8,9 +8,15 @@
 import Foundation
 import SwiftUI
 
+enum DrawingPathType {
+    case fill
+    case erase
+}
+
 struct DrawingPath: Identifiable {
     let id = UUID()
     var points: [CGPoint]
     var color: Color
     let lineWidth: CGFloat
+    let type: DrawingPathType
 }

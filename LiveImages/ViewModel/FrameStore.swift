@@ -9,7 +9,35 @@ import Foundation
 import Observation
 
 
-class FrameStore: ObservableObject {
-    @Published var frames: [DrawingFrame] = [.init(name: "Frame 1", paths: [])]
+@Observable
+class FrameStore {
+    var frames: [DrawingFrame] = [.init(name: "Frame 1")]
     
+    func addPath(_ path: DrawingPath, to frameIndex: Int) {
+        guard frameIndex < frames.count, frameIndex >= 0 else { return }
+        guard frames[frameIndex].pathHead != nil else {
+            let nextPath = PathNode(erasePath: path.type == .erase ? path : nil, drawingPaths: path.type == .erase ? [] : [path])
+            frames[frameIndex].appendPath(nextPath)
+            return
+        }
+        
+        switch path.type {
+        case .erase:
+            if frames[frameIndex].pathHead?.erasePath == nil {
+                frames[frameIndex].pathHead?.erasePath = path
+            } else {
+                let nextPath = PathNode(erasePath: path)
+                frames[frameIndex].appendPath(nextPath)
+            }
+        case .fill:
+            if frames[frameIndex].pathHead?.erasePath == nil {
+                frames[frameIndex].pathHead?.drawingPaths.append(path)
+            } else {
+                let nextPath = PathNode(drawingPaths: [path])
+                frames[frameIndex].appendPath(nextPath)
+            }
+        }
+        
+        
+    }
 }

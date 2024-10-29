@@ -15,11 +15,11 @@ fileprivate enum Instument: Int {
 }
 
 struct ContentView: View {
-    @EnvironmentObject var frameStore: FrameStore
+    var frameStore: FrameStore = .init()
     @State private var lineWidth: CGFloat = 25
     @State private var instrument: Instument = .none
     @State private var selectedColor: Color = .red
-    @State private var currentPath: DrawingPath = .init(points: [], color: Color(.liveImagesBlue), lineWidth: 5)
+    @State private var currentPath: [CGPoint] = []
     @State private var currentFrameIndex = 0
     
     @Environment(\.undoManager) var undoManager
@@ -110,31 +110,40 @@ struct ContentView: View {
             Image(.whiteboard)
                 .resizable()
                 .clipShape(RoundedRectangle(cornerRadius: 16))
-            
             Canvas(colorMode: .nonLinear, rendersAsynchronously: false) { context, size in
-                let strokeStype = StrokeStyle(lineWidth: lineWidth, lineCap: .round, lineJoin: .round, miterLimit: 0, dash: [], dashPhase: 0)
                 
-                if !frameStore.frames.isEmpty {
-                    for layer in frameStore.frames[currentFrameIndex].paths {
-                        var path = Path()
-                        if layer.points.count > 1 {
-                            path.addLines(layer.points)
-                            context.stroke(path, with: .color(layer.color), style: strokeStype)
-                        } else {
-                            let path = Path(ellipseIn: CGRect(x: layer.points.first!.x - layer.lineWidth / 2, y: layer.points.first!.y - layer.lineWidth / 2, width: layer.lineWidth, height: layer.lineWidth))
-                            context.fill(path, with: .color(layer.color))
+                let savedContext = context
+                if instrument == .eraser {
+                    if currentPath.count != 1 {
+                        var currentDrawingPath = Path()
+                        currentDrawingPath.addLines(currentPath)
+                        context.clipToLayer(options: .inverse) { layerContext in
+                            layerContext.stroke(currentDrawingPath, with: .color(selectedColor), style: strokeStyle)
                         }
-                        
+                    } else {
+                        let path = Path(ellipseIn: CGRect(x: currentPath[0].x - lineWidth / 2, y: currentPath[0].y - lineWidth / 2, width: lineWidth, height: lineWidth))
+                        context.clipToLayer(options: .inverse) { layerContext in
+                            layerContext.fill(path, with: .color(selectedColor))
+                        }
                     }
                 }
                 
-                if currentPath.points.count != 1 {
-                    var currentDrawingPath = Path()
-                    currentDrawingPath.addLines(currentPath.points)
-                    context.stroke(currentDrawingPath, with: .color(currentPath.color), style: strokeStype)
-                } else {
-                    let path = Path(ellipseIn: CGRect(x: currentPath.points[0].x - lineWidth / 2, y: currentPath.points[0].y - lineWidth / 2, width: lineWidth, height: lineWidth))
-                    context.fill(path, with: .color(currentPath.color))
+                let drawingPath: PathNode? = frameStore.frames[currentFrameIndex].pathHead
+                if let drawingPath {
+                    drawPath(drawingPath, in: &context)
+                }
+                
+                if instrument != .eraser {
+                    if currentPath.count != 1 {
+                        var currentDrawingPath = Path()
+                        currentDrawingPath.addLines(currentPath)
+                        savedContext.drawLayer { layerContext in
+                            layerContext.stroke(currentDrawingPath, with: .color(selectedColor), style: strokeStyle)
+                        }
+                    } else {
+                        let path = Path(ellipseIn: CGRect(x: currentPath[0].x - lineWidth / 2, y: currentPath[0].y - lineWidth / 2, width: lineWidth, height: lineWidth))
+                        savedContext.fill(path, with: .color(selectedColor))
+                    }
                 }
                 
             }
@@ -144,17 +153,49 @@ struct ContentView: View {
         }
     }
     
+    private func drawPath(_ drawingPath: PathNode, in context: inout GraphicsContext) {
+        if let toErase = drawingPath.erasePath {
+            var path = Path()
+            path.addLines(toErase.points)
+            context.clipToLayer(options: .inverse){ clipedContext in
+                clipedContext.stroke(path, with: .color(toErase.color), style: strokeStyle)
+            }
+        }
+        if let next = drawingPath.next {
+            var newContext = context
+            drawPath(next, in: &newContext)
+        }
+        for path in drawingPath.drawingPaths {
+            drawPath(path, in: &context)
+        }
+    }
+    
+    private func drawPath(_ path: DrawingPath, in context: inout GraphicsContext) {
+        if path.points.count != 1 {
+            var currentDrawingPath = Path()
+            currentDrawingPath.addLines(path.points)
+            context.drawLayer { layerContext in
+                layerContext.stroke(currentDrawingPath, with: .color(path.color), style: strokeStyle)
+            }
+        } else {
+            let elipsePath = Path(ellipseIn: CGRect(x: path.points[0].x - path.lineWidth / 2, y: path.points[0].y - path.lineWidth / 2, width: path.lineWidth, height: path.lineWidth))
+            context.fill(elipsePath, with: .color(path.color))
+        }
+    }
+    
     @GestureState private var gestureState: (Bool, CGPoint) = (false, .zero)
     private var drawingGesture: some Gesture {
         LongPressGesture(minimumDuration: 0, maximumDistance: 10).simultaneously(with: DragGesture(minimumDistance: 0, coordinateSpace: .local))
             .updating($gestureState) { value, state, transaction in
+                guard instrument != .none else { return }
                 state.1 = value.second?.location ?? .zero
                 state.0 = value.first ?? false
-                currentPath.points.append(state.1)
+                currentPath.append(state.1)
             }
             .onEnded{ value in
-                frameStore.frames[currentFrameIndex].paths.append(currentPath)
-                currentPath = .init(points: [], color: selectedColor, lineWidth: lineWidth)
+                guard instrument != .none else { return }
+                frameStore.addPath(DrawingPath(points: currentPath, color: selectedColor, lineWidth: lineWidth, type: instrument == .eraser ? .erase : .fill), to: currentFrameIndex)
+                currentPath = []
             }
     }
     
@@ -193,13 +234,13 @@ struct ContentView: View {
             }
         }
     }
-    
-    private func erasePoints(at location: CGPoint) {
-        
+    private var strokeStyle: StrokeStyle {
+        StrokeStyle(lineWidth: lineWidth, lineCap: .round, lineJoin: .round, miterLimit: 0, dash: [], dashPhase: 0)
     }
 }
 
+
 #Preview {
     ContentView()
-        .environmentObject(FrameStore())
+        
 }
