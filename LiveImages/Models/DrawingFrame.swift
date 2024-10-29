@@ -7,7 +7,7 @@
 
 import Foundation
 
-struct DrawingFrame: Identifiable {
+struct DrawingFrame: Identifiable, Equatable {
     let id = UUID()
     var name: String
     var pathHead: PathNode? {
@@ -23,6 +23,10 @@ struct DrawingFrame: Identifiable {
     func appendPath(_ node: PathNode) {
         node.next = dummy.next
         dummy.next = node
+    }
+    
+    func removeFirst() {
+        dummy.next = dummy.next?.next
     }
     
 }

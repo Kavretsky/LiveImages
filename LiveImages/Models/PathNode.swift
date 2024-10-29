@@ -5,7 +5,10 @@
 //  Created by Nikolay Kavretsky on 29.10.2024.
 //
 
-class PathNode {
+import Observation
+
+@Observable
+class PathNode: Equatable {
     var erasePath: DrawingPath?
     var next: PathNode? = nil
     var drawingPaths: [DrawingPath] = []
@@ -14,5 +17,9 @@ class PathNode {
         self.erasePath = erasePath
         self.next = next
         self.drawingPaths = drawingPaths
+    }
+    
+    static func == (lhs: PathNode, rhs: PathNode) -> Bool {
+        lhs.erasePath == rhs.erasePath && lhs.next === rhs.next && lhs.drawingPaths == rhs.drawingPaths
     }
 }

@@ -7,10 +7,10 @@
 
 import SwiftUI
 
-fileprivate enum Instument: Int {
-    case pen
-    case eraser
-    case brush
+fileprivate enum Instument: String {
+    case pen = "Pen"
+    case eraser = "Eraser"
+    case brush = "Brush"
     case none
 }
 
@@ -21,8 +21,6 @@ struct ContentView: View {
     @State private var selectedColor: Color = .red
     @State private var currentPath: [CGPoint] = []
     @State private var currentFrameIndex = 0
-    
-    @Environment(\.undoManager) var undoManager
     
     var body: some View {
         ZStack {
@@ -53,16 +51,15 @@ struct ContentView: View {
     private var undoRedoView: some View {
         HStack(spacing: 8) {
             Button {
-                undoManager?.undo()
+                frameStore.undo()
             } label: {
-                Image(.rightUnactive)
+                Image(frameStore.canUndo ? .leftActive : .leftUnactive)
             }
             Button {
-                undoManager?.redo()
+                frameStore.redo()
             } label: {
-                Image(.leftUnactive)
+                Image(frameStore.canRedo ? .rightActive : .rightNotactive)
             }
-            
         }
     }
     
@@ -109,7 +106,6 @@ struct ContentView: View {
         ZStack {
             Image(.whiteboard)
                 .resizable()
-                .clipShape(RoundedRectangle(cornerRadius: 16))
             Canvas(colorMode: .nonLinear, rendersAsynchronously: false) { context, size in
                 
                 let savedContext = context
@@ -151,6 +147,7 @@ struct ContentView: View {
                 drawingGesture
             )
         }
+        .clipShape(RoundedRectangle(cornerRadius: 16))
     }
     
     private func drawPath(_ drawingPath: PathNode, in context: inout GraphicsContext) {
@@ -194,7 +191,8 @@ struct ContentView: View {
             }
             .onEnded{ value in
                 guard instrument != .none else { return }
-                frameStore.addPath(DrawingPath(points: currentPath, color: selectedColor, lineWidth: lineWidth, type: instrument == .eraser ? .erase : .fill), to: currentFrameIndex)
+                let newPath = DrawingPath(points: currentPath, color: selectedColor, lineWidth: lineWidth, type: instrument == .eraser ? .erase : .fill)
+                frameStore.addPathWithUndo(newPath, to: currentFrameIndex, clearRedo: true)
                 currentPath = []
             }
     }

@@ -8,12 +8,12 @@
 import Foundation
 import SwiftUI
 
-enum DrawingPathType {
+enum DrawingPathType: Equatable {
     case fill
     case erase
 }
 
-struct DrawingPath: Identifiable {
+struct DrawingPath: Identifiable, Equatable {
     let id = UUID()
     var points: [CGPoint]
     var color: Color
