@@ -6,3 +6,10 @@
 //
 
 import Foundation
+import Observation
+
+
+class FrameStore: ObservableObject {
+    @Published var frames: [DrawingFrame] = [.init(name: "Frame 1", paths: [])]
+    
+}
