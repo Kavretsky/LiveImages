@@ -78,13 +78,12 @@ struct ContentView: View {
     private var frameManagerView: some View {
         HStack(spacing: 16) {
             Button {
-                //MARK: TODO
+                frameStore.removeFrame()
             } label: {
                 Image(.bin)
             }
             
             Button {
-//                renderer()
                 frameStore.addFrame()
             } label: {
                 Image(.filePlus)

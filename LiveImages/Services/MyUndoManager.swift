@@ -40,5 +40,10 @@ final class MyUndoManager {
         !undoStackHash[frameID, default: []].isEmpty
     }
     
+    func clearStack(for frameID: String) {
+        undoStackHash[frameID] = []
+        redoStackHash[frameID] = []
+    }
+    
     
 }

@@ -16,8 +16,22 @@ final class FrameStore {
     
     private(set) var currentFrameIndex = 0
     
+    func removeFrame() {
+        clearCurrent()
+        if currentFrameIndex > 0 {
+            currentFrameIndex -= 1
+        }
+    }
+    
+    func clearCurrent() {
+        undoManager.clearStack(for: frames[currentFrameIndex].id)
+        frames[currentFrameIndex] = .init(name: "Frame \(frames.count)")
+    }
+    
     func addFrame() {
-        frames.append(.init(name: "Frame \(frames.count + 1)"))
+        if currentFrameIndex + 1 == frames.count  {
+            frames.append(.init(name: "Frame \(frames.count + 1)"))
+        }
         currentFrameIndex += 1
     }
     
