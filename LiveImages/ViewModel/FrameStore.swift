@@ -14,20 +14,11 @@ final class FrameStore {
     var frames: [DrawingFrame] = [.init(name: "Frame 1")]
     private let undoManager = MyUndoManager()
     
-    var canRedo: Bool {
-        undoManager.canRedo
-    }
+    private(set) var currentFrameIndex = 0
     
-    var canUndo: Bool {
-        undoManager.canUndo
-    }
-    
-    func undo() {
-        undoManager.undo()
-    }
-    
-    func redo() {
-        undoManager.redo()
+    func addFrame() {
+        frames.append(.init(name: "Frame \(frames.count + 1)"))
+        currentFrameIndex += 1
     }
     
     private func addPath(_ path: DrawingPath, to frameIndex: Int) {
@@ -75,17 +66,34 @@ final class FrameStore {
         }
     }
     
-    func addPathWithUndo(_ path: DrawingPath, to frameIndex: Int, clearRedo: Bool = false) {
-        addPath(path, to: frameIndex)
-        undoManager.registerUndo(operation: "Remove path", removePrevious: clearRedo) { [weak self] in
-            self?.removePathWithUndo(path, from: frameIndex)
+    func addPathWithUndo(_ path: DrawingPath, clearRedo: Bool = false) {
+        addPath(path, to: currentFrameIndex)
+        undoManager.registerUndo(frameID: frames[currentFrameIndex].id, removePrevious: clearRedo) { [weak self] in
+            self?.removePathWithUndo(path)
         }
     }
     
-    private func removePathWithUndo(_ path: DrawingPath, from frameIndex: Int) {
-        removePath(path, from: frameIndex)
-        undoManager.registerRedu(operation: "Add path") { [weak self] in
-            self?.addPathWithUndo(path, to: frameIndex)
+    private func removePathWithUndo(_ path: DrawingPath) {
+        removePath(path, from: currentFrameIndex)
+        undoManager.registerRedu(frameID: frames[currentFrameIndex].id) { [weak self] in
+            self?.addPathWithUndo(path)
         }
     }
+    
+    var canRedo: Bool {
+        undoManager.canRedo(for: frames[currentFrameIndex].id)
+    }
+    
+    var canUndo: Bool {
+        undoManager.canUndo(for: frames[currentFrameIndex].id)
+    }
+    
+    func undo() {
+        undoManager.undo(for: frames[currentFrameIndex].id)
+    }
+    
+    func redo() {
+        undoManager.redo(for: frames[currentFrameIndex].id)
+    }
+    
 }

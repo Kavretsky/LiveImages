@@ -9,35 +9,35 @@ import Observation
 
 @Observable
 final class MyUndoManager {
-    private var undoStack: [() -> Void] = []
-    private var redoStack: [() -> Void] = []
+    private var undoStackHash = [String : [() -> Void]]()
+    private var redoStackHash = [String : [() -> Void]]()
     
-    func registerUndo(operation: String, removePrevious: Bool = false, _ closure: @escaping () -> Void) {
-        undoStack.append(closure)
+    func registerUndo(frameID: String, removePrevious: Bool = false, _ closure: @escaping () -> Void) {
+        undoStackHash[frameID, default: []].append(closure)
         if removePrevious {
-            redoStack = []
+            redoStackHash[frameID] = []
         }
     }
-    func registerRedu(operation: String, _ closure: @escaping () -> Void) {
-        redoStack.append(closure)
+    func registerRedu(frameID: String, _ closure: @escaping () -> Void) {
+        redoStackHash[frameID, default: []].append(closure)
     }
     
-    func undo() {
-        guard !undoStack.isEmpty else { return }
-        undoStack.removeLast()()
+    func undo(for frameID: String) {
+        guard !undoStackHash[frameID, default: []].isEmpty else { return }
+        undoStackHash[frameID, default: []].removeLast()()
     }
     
-    func redo() {
-        guard !redoStack.isEmpty else { return }
-        redoStack.removeLast()()
+    func redo(for frameID: String) {
+        guard !redoStackHash[frameID, default: []].isEmpty else { return }
+        redoStackHash[frameID, default: []].removeLast()()
     }
     
-    var canRedo: Bool {
-        !redoStack.isEmpty
+    func canRedo(for frameID: String) -> Bool {
+        !redoStackHash[frameID, default: []].isEmpty
     }
     
-    var canUndo: Bool {
-        !undoStack.isEmpty
+    func canUndo(for frameID: String) -> Bool {
+        !undoStackHash[frameID, default: []].isEmpty
     }
     
     

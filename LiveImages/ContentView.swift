@@ -22,7 +22,8 @@ struct ContentView: View {
     @State private var instrument: Instument = .none
     @State private var selectedColor: Color = .liveImagesBlue
     @State private var currentPath: [CGPoint] = []
-    @State private var currentFrameIndex = 0
+    @State private var image: Image?
+    @Environment(\.displayScale) var displayScale
     
     @State private var lastColors: [Color] = [.white, .liveImagesOrange, .liveImagesBlack, .liveImagesBlue]
     
@@ -37,20 +38,15 @@ struct ContentView: View {
                 Spacer(minLength: 22)
                 instrumentsView
                     .overlay(alignment: .bottom) {
-                        
                         if instrument == .color {
                             palette
                                 .padding(.bottom, 48)
                                 .transition(.blurReplace())
                                 .animation(.spring(), value: instrument)
                         }
-                        
-                        
-                        
                     }
             }
             .padding(16)
-            
         }
     }
     
@@ -88,7 +84,8 @@ struct ContentView: View {
             }
             
             Button {
-                //MARK: TODO
+//                renderer()
+                frameStore.addFrame()
             } label: {
                 Image(.filePlus)
             }
@@ -118,50 +115,66 @@ struct ContentView: View {
         }
     }
     
+    
+    
+    private func canvas(for frameIndex: Int) -> some View {
+        Canvas(colorMode: .nonLinear, rendersAsynchronously: false) { context, size in
+            let savedContext = context
+            if instrument == .eraser && frameIndex == frameStore.currentFrameIndex {
+                if currentPath.count != 1 {
+                    var currentDrawingPath = Path()
+                    currentDrawingPath.addLines(currentPath)
+                    context.clipToLayer(options: .inverse) { layerContext in
+                        layerContext.stroke(currentDrawingPath, with: .color(selectedColor), style: strokeStyle)
+                    }
+                } else {
+                    let path = Path(ellipseIn: CGRect(x: currentPath[0].x - lineWidth / 2, y: currentPath[0].y - lineWidth / 2, width: lineWidth, height: lineWidth))
+                    context.clipToLayer(options: .inverse) { layerContext in
+                        layerContext.fill(path, with: .color(selectedColor))
+                    }
+                }
+            }
+            
+            let drawingPath: PathNode? = frameStore.frames[frameIndex].pathHead
+            if let drawingPath {
+                drawPath(drawingPath, in: &context)
+            }
+            
+            if instrument != .eraser && frameIndex == frameStore.currentFrameIndex {
+                if currentPath.count != 1 {
+                    var currentDrawingPath = Path()
+                    currentDrawingPath.addLines(currentPath)
+                    savedContext.drawLayer { layerContext in
+                        layerContext.stroke(currentDrawingPath, with: .color(selectedColor), style: strokeStyle)
+                    }
+                } else {
+                    let path = Path(ellipseIn: CGRect(x: currentPath[0].x - lineWidth / 2, y: currentPath[0].y - lineWidth / 2, width: lineWidth, height: lineWidth))
+                    savedContext.fill(path, with: .color(selectedColor))
+                }
+            }
+            
+        }
+    }
+    
     private var drawingArea: some View {
         ZStack {
             Image(.whiteboard)
                 .resizable()
-            Canvas(colorMode: .nonLinear, rendersAsynchronously: false) { context, size in
-                
-                let savedContext = context
-                if instrument == .eraser {
-                    if currentPath.count != 1 {
-                        var currentDrawingPath = Path()
-                        currentDrawingPath.addLines(currentPath)
-                        context.clipToLayer(options: .inverse) { layerContext in
-                            layerContext.stroke(currentDrawingPath, with: .color(selectedColor), style: strokeStyle)
-                        }
-                    } else {
-                        let path = Path(ellipseIn: CGRect(x: currentPath[0].x - lineWidth / 2, y: currentPath[0].y - lineWidth / 2, width: lineWidth, height: lineWidth))
-                        context.clipToLayer(options: .inverse) { layerContext in
-                            layerContext.fill(path, with: .color(selectedColor))
-                        }
-                    }
-                }
-                
-                let drawingPath: PathNode? = frameStore.frames[currentFrameIndex].pathHead
-                if let drawingPath {
-                    drawPath(drawingPath, in: &context)
-                }
-                
-                if instrument != .eraser {
-                    if currentPath.count != 1 {
-                        var currentDrawingPath = Path()
-                        currentDrawingPath.addLines(currentPath)
-                        savedContext.drawLayer { layerContext in
-                            layerContext.stroke(currentDrawingPath, with: .color(selectedColor), style: strokeStyle)
-                        }
-                    } else {
-                        let path = Path(ellipseIn: CGRect(x: currentPath[0].x - lineWidth / 2, y: currentPath[0].y - lineWidth / 2, width: lineWidth, height: lineWidth))
-                        savedContext.fill(path, with: .color(selectedColor))
-                    }
-                }
-                
+//            if currentFrameIndex > 0, frameStore.frames[currentFrameIndex - 1].image != nil {
+//            if let image {
+////                frameStore.frames[currentFrameIndex - 1].image!
+//                image
+//                    .resizable()
+//                    .opacity(0.5)
+//            }
+            if frameStore.currentFrameIndex > 0 {
+                canvas(for: frameStore.currentFrameIndex - 1)
+                    .opacity(0.5)
             }
-            .gesture(
-                drawingGesture, isEnabled: instrument == .pen || instrument == .eraser
-            )
+            canvas(for: frameStore.currentFrameIndex)
+                .gesture(
+                    drawingGesture, isEnabled: instrument == .pen || instrument == .eraser
+                )
         }
         .clipShape(RoundedRectangle(cornerRadius: 16))
     }
@@ -203,7 +216,7 @@ struct ContentView: View {
             })
             .onEnded{ value in
                 let newPath = DrawingPath(points: currentPath, color: selectedColor, lineWidth: lineWidth, type: instrument == .eraser ? .erase : .fill)
-                frameStore.addPathWithUndo(newPath, to: currentFrameIndex, clearRedo: true)
+                frameStore.addPathWithUndo(newPath, clearRedo: true)
                 currentPath = []
             }
     }
@@ -299,6 +312,7 @@ struct ContentView: View {
         .background(.ultraThinMaterial)
         .clipShape(RoundedRectangle(cornerRadius: 4))
     }
+    
 }
 
 

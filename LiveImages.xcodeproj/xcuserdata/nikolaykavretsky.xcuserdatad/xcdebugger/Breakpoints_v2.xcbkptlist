@@ -7,16 +7,16 @@
       <BreakpointProxy
          BreakpointExtensionID = "Xcode.Breakpoint.FileBreakpoint">
          <BreakpointContent
-            uuid = "FF8ACFC8-1669-4420-A6DD-E397F1BA6AB4"
+            uuid = "CEB944AE-0288-4D4A-B7A5-717999F0CAE4"
             shouldBeEnabled = "No"
             ignoreCount = "0"
             continueAfterRunningActions = "No"
             filePath = "LiveImages/ViewModel/FrameStore.swift"
             startingColumnNumber = "9223372036854775807"
             endingColumnNumber = "9223372036854775807"
-            startingLineNumber = "78"
-            endingLineNumber = "78"
-            landmarkName = "addPathWithUndo(_:to:clearRedo:)"
+            startingLineNumber = "19"
+            endingLineNumber = "19"
+            landmarkName = "addFrame()"
             landmarkType = "7">
          </BreakpointContent>
       </BreakpointProxy>

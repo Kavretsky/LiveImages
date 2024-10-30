@@ -6,10 +6,12 @@
 //
 
 import Foundation
+import SwiftUI
 
 struct DrawingFrame: Identifiable, Equatable {
-    let id = UUID()
+    let id = UUID().uuidString
     var name: String
+    var image: Image?
     var pathHead: PathNode? {
         dummy.next
     }
@@ -27,6 +29,10 @@ struct DrawingFrame: Identifiable, Equatable {
     
     func removeFirst() {
         dummy.next = dummy.next?.next
+    }
+    
+    static func == (lhs: DrawingFrame, rhs: DrawingFrame) -> Bool {
+        lhs.id == rhs.id
     }
     
 }

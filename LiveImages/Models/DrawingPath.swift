@@ -14,7 +14,7 @@ enum DrawingPathType: Equatable {
 }
 
 struct DrawingPath: Identifiable, Equatable {
-    let id = UUID()
+    let id = UUID().uuidString
     var points: [CGPoint]
     var color: Color
     let lineWidth: CGFloat
