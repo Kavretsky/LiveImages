@@ -196,7 +196,6 @@ struct ContentView: View {
         }
     }
     
-    @GestureState private var gestureState: (Bool, CGPoint) = (false, .zero)
     private var drawingGesture: some Gesture {
         LongPressGesture(minimumDuration: 0, maximumDistance: 10).simultaneously(with: DragGesture(minimumDistance: 0))
             .onChanged({ value in
@@ -250,12 +249,13 @@ struct ContentView: View {
             } label: {
                 ZStack {
                     Circle()
-                        .foregroundStyle(.accent)
+                        .foregroundStyle(instrument == .color ? .accent : .white)
                         .frame(width: 28, height: 28)
                     Circle()
                         .foregroundStyle(selectedColor)
-                        .frame(width: instrument == .color ? 26 : 28, height: instrument == .color ? 26 : 28)
+                        .frame(width: 26, height: 26)
                 }
+                .frame(width: 32, height: 32)
             }
             
         }
@@ -279,6 +279,10 @@ struct ContentView: View {
                     .frame(width: 28, height: 28)
                     .foregroundStyle(color)
                     .padding(4)
+                    .onTapGesture {
+                        selectedColor = color
+                        
+                    }
             }
         }
         .padding(16)
