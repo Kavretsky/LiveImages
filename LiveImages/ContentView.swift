@@ -34,8 +34,13 @@ struct ContentView: View {
             VStack {
                 headerView
                 Spacer(minLength: 32)
-                drawingArea
+                if frameStore.isPlaying {
+                    animatableArea
+                } else {
+                    drawingArea
+                }
                 Spacer(minLength: 22)
+                
                 instrumentsView
                     .overlay(alignment: .bottom) {
                         if instrument == .color {
@@ -45,6 +50,7 @@ struct ContentView: View {
                                 .animation(.spring(), value: instrument)
                         }
                     }
+                
             }
             .padding(16)
         }
@@ -52,9 +58,11 @@ struct ContentView: View {
     
     private var headerView: some View {
         HStack(alignment: .center) {
-            undoRedoView
-            Spacer()
-            frameManagerView
+            if !frameStore.isPlaying {
+                undoRedoView
+                Spacer()
+                frameManagerView
+            }
             Spacer()
             animationView
         }
@@ -101,15 +109,15 @@ struct ContentView: View {
     private var animationView: some View {
         HStack(spacing: 16) {
             Button {
-                //MARK: TODO
+                frameStore.startPlay()
             } label: {
-                Image(.playUnactive)
+                Image(frameStore.isPlaying ? .playUnactive : .playActive)
             }
             
             Button {
-                //MARK: TODO
+                frameStore.stopPlay()
             } label: {
-                Image(.pauseUnactive)
+                Image(frameStore.isPlaying ? .pauseActive : .pauseUnactive)
             }
         }
     }
@@ -155,17 +163,19 @@ struct ContentView: View {
         }
     }
     
+    private var animatableArea: some View {
+        ZStack {
+            Image(.whiteboard)
+                .resizable()
+            canvas(for: frameStore.animationFrameIndex)
+        }
+        .clipShape(RoundedRectangle(cornerRadius: 16))
+    }
+    
     private var drawingArea: some View {
         ZStack {
             Image(.whiteboard)
                 .resizable()
-//            if currentFrameIndex > 0, frameStore.frames[currentFrameIndex - 1].image != nil {
-//            if let image {
-////                frameStore.frames[currentFrameIndex - 1].image!
-//                image
-//                    .resizable()
-//                    .opacity(0.5)
-//            }
             if frameStore.currentFrameIndex > 0 {
                 canvas(for: frameStore.currentFrameIndex - 1)
                     .opacity(0.5)
@@ -219,57 +229,62 @@ struct ContentView: View {
                 currentPath = []
             }
     }
-    
+    @ViewBuilder
     private var instrumentsView: some View {
-        HStack(spacing: 16) {
-            Image(.pencil)
-                .renderingMode(.template)
-                .foregroundStyle(instrument == .pen ? .accent : .white)
-                .onTapGesture {
-                    instrument = instrument == .pen ? .none : .pen
+        if frameStore.isPlaying {
+            Color.clear
+                .frame(height: 32)
+        } else {
+            HStack(spacing: 16) {
+                Image(.pencil)
+                    .renderingMode(.template)
+                    .foregroundStyle(instrument == .pen ? .accent : .white)
+                    .onTapGesture {
+                        instrument = instrument == .pen ? .none : .pen
+                    }
+                    .frame(width: 32, height: 32)
+                Button {
+                    instrument = instrument == .brush ? .none : .brush
+                } label: {
+                    Image(.brush)
+                        .renderingMode(.template)
+                        .foregroundStyle(instrument == .brush ? .accent : .white)
+                        .frame(width: 32, height: 32)
                 }
-                .frame(width: 32, height: 32)
-            Button {
-                instrument = instrument == .brush ? .none : .brush
-            } label: {
-                Image(.brush)
-                    .renderingMode(.template)
-                    .foregroundStyle(instrument == .brush ? .accent : .white)
-                    .frame(width: 32, height: 32)
-            }
-            
-            Button {
-                instrument = instrument == .eraser ? .none : .eraser
-            } label: {
-                Image(.erase)
-                    .renderingMode(.template)
-                    .foregroundStyle(instrument == .eraser ? .accent : .white)
-                    .frame(width: 32, height: 32)
-            }
-            
-            Button {
-                instrument = instrument == .instruments ? .none : .instruments
-            } label: {
-                Image(.instruments)
-                    .renderingMode(.template)
-                    .foregroundStyle(instrument == .instruments ? .accent : .white)
-                    .frame(width: 32, height: 32)
-            }
-            
-            Button {
-                instrument = instrument == .color ? .none : .color
-            } label: {
-                ZStack {
-                    Circle()
-                        .foregroundStyle(instrument == .color ? .accent : .white)
-                        .frame(width: 28, height: 28)
-                    Circle()
-                        .foregroundStyle(selectedColor)
-                        .frame(width: 26, height: 26)
+                
+                Button {
+                    instrument = instrument == .eraser ? .none : .eraser
+                } label: {
+                    Image(.erase)
+                        .renderingMode(.template)
+                        .foregroundStyle(instrument == .eraser ? .accent : .white)
+                        .frame(width: 32, height: 32)
                 }
-                .frame(width: 32, height: 32)
+                
+                Button {
+                    instrument = instrument == .instruments ? .none : .instruments
+                } label: {
+                    Image(.instruments)
+                        .renderingMode(.template)
+                        .foregroundStyle(instrument == .instruments ? .accent : .white)
+                        .frame(width: 32, height: 32)
+                }
+                
+                Button {
+                    instrument = instrument == .color ? .none : .color
+                } label: {
+                    ZStack {
+                        Circle()
+                            .foregroundStyle(instrument == .color ? .accent : .white)
+                            .frame(width: 28, height: 28)
+                        Circle()
+                            .foregroundStyle(selectedColor)
+                            .frame(width: 26, height: 26)
+                    }
+                    .frame(width: 32, height: 32)
+                }
+                
             }
-            
         }
     }
     private var strokeStyle: StrokeStyle {
@@ -311,7 +326,6 @@ struct ContentView: View {
         .background(.ultraThinMaterial)
         .clipShape(RoundedRectangle(cornerRadius: 4))
     }
-    
 }
 
 

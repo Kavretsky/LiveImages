@@ -13,14 +13,31 @@ import SwiftUI
 final class FrameStore {
     var frames: [DrawingFrame] = [.init(name: "Frame 1")]
     private let undoManager = MyUndoManager()
-    
+    private(set) var isPlaying: Bool = false
+    private(set) var animationFrameIndex = 0
     private(set) var currentFrameIndex = 0
+    private var timer: Timer?
     
     func removeFrame() {
         clearCurrent()
         if currentFrameIndex > 0 {
             currentFrameIndex -= 1
+            frames.remove(at: currentFrameIndex + 1)
         }
+    }
+    
+    func startPlay() {
+        currentFrameIndex = 0
+        if timer == nil {
+            isPlaying = true
+            startTimer()
+        }
+        
+    }
+    
+    func stopPlay() {
+        isPlaying = false
+        timer?.invalidate()
     }
     
     func clearCurrent() {
@@ -108,6 +125,13 @@ final class FrameStore {
     
     func redo() {
         undoManager.redo(for: frames[currentFrameIndex].id)
+    }
+    private var framePerSecond: Int = 1
+    private func startTimer() {
+        timer = Timer.scheduledTimer(withTimeInterval: 1.0 / Double(framePerSecond), repeats: true) { [weak self] _ in
+            guard let self else { return }
+            animationFrameIndex = (animationFrameIndex + 1) % frames.count
+        }
     }
     
 }
