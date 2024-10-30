@@ -29,7 +29,7 @@ struct ContentView: View {
     
     var body: some View {
         ZStack {
-            Color(.black)
+            Color(.liveImagesBlack)
                 .ignoresSafeArea()
             VStack {
                 headerView
@@ -64,7 +64,7 @@ struct ContentView: View {
                 frameManagerView
             }
             Spacer()
-            animationView
+            playControls
         }
     }
     
@@ -106,19 +106,21 @@ struct ContentView: View {
         }
     }
     
-    private var animationView: some View {
+    private var playControls: some View {
         HStack(spacing: 16) {
-            Button {
-                frameStore.startPlay()
-            } label: {
-                Image(frameStore.isPlaying ? .playUnactive : .playActive)
-            }
-            
             Button {
                 frameStore.stopPlay()
             } label: {
                 Image(frameStore.isPlaying ? .pauseActive : .pauseUnactive)
             }
+            Button {
+                instrument = .none
+                frameStore.startPlay()
+            } label: {
+                Image(frameStore.frames.count > 1 ? .playActive : .playUnactive)
+            }
+            
+            
         }
     }
     

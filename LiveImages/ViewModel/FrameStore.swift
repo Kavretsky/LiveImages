@@ -16,7 +16,7 @@ final class FrameStore {
     private(set) var isPlaying: Bool = false
     private(set) var animationFrameIndex = 0
     private(set) var currentFrameIndex = 0
-    private var timer: Timer?
+    private var timer: Timer = Timer()
     
     func removeFrame() {
         clearCurrent()
@@ -27,17 +27,20 @@ final class FrameStore {
     }
     
     func startPlay() {
-        currentFrameIndex = 0
-        if timer == nil {
-            isPlaying = true
-            startTimer()
-        }
+        guard frames.count > 1 else { return }
+        
+        isPlaying = true
+        timer.invalidate()
+        animationFrameIndex = 0
+        startTimer()
+        
         
     }
     
     func stopPlay() {
         isPlaying = false
-        timer?.invalidate()
+        timer.invalidate()
+        animationFrameIndex = 0
     }
     
     func clearCurrent() {
