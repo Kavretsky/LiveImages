@@ -10,7 +10,7 @@ import Observation
 import SwiftUI
 
 @Observable
-class FrameStore {
+final class FrameStore {
     var frames: [DrawingFrame] = [.init(name: "Frame 1")]
     private let undoManager = MyUndoManager()
     

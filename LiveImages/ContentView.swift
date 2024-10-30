@@ -11,16 +11,20 @@ fileprivate enum Instument: String {
     case pen = "Pen"
     case eraser = "Eraser"
     case brush = "Brush"
+    case color = "Color"
+    case instruments = "Instruments"
     case none
 }
 
 struct ContentView: View {
     var frameStore: FrameStore = .init()
     @State private var lineWidth: CGFloat = 25
-    @State private var instrument: Instument = .none
+    @State private var instrument: Instument = .instruments
     @State private var selectedColor: Color = .red
     @State private var currentPath: [CGPoint] = []
     @State private var currentFrameIndex = 0
+    
+    @State private var lastColors: [Color] = [.white, .liveImagesOrange, .liveImagesBlack, .liveImagesBlue]
     
     var body: some View {
         ZStack {
@@ -32,6 +36,16 @@ struct ContentView: View {
                 drawingArea
                 Spacer(minLength: 22)
                 instrumentsView
+                    .overlay(alignment: .bottom) {
+                        
+                        if instrument != .none {
+                            palette
+                                .padding(.bottom, 48)
+                        }
+                        
+                        
+                        
+                    }
             }
             .padding(16)
             
@@ -175,8 +189,8 @@ struct ContentView: View {
                 layerContext.stroke(currentDrawingPath, with: .color(path.color), style: strokeStyle)
             }
         } else {
-            let elipsePath = Path(ellipseIn: CGRect(x: path.points[0].x - path.lineWidth / 2, y: path.points[0].y - path.lineWidth / 2, width: path.lineWidth, height: path.lineWidth))
-            context.fill(elipsePath, with: .color(path.color))
+            let ellipsePath = Path(ellipseIn: CGRect(x: path.points[0].x - path.lineWidth / 2, y: path.points[0].y - path.lineWidth / 2, width: path.lineWidth, height: path.lineWidth))
+            context.fill(ellipsePath, with: .color(path.color))
         }
     }
     
@@ -205,10 +219,14 @@ struct ContentView: View {
                 .onTapGesture {
                     instrument = instrument == .pen ? .none : .pen
                 }
+                .frame(width: 32, height: 32)
             Button {
-                //MARK: TODO
+                instrument = instrument == .brush ? .none : .brush
             } label: {
                 Image(.brush)
+                    .renderingMode(.template)
+                    .foregroundStyle(instrument == .brush ? .accent : .white)
+                    .frame(width: 32, height: 32)
             }
             
             Button {
@@ -217,28 +235,66 @@ struct ContentView: View {
                 Image(.erase)
                     .renderingMode(.template)
                     .foregroundStyle(instrument == .eraser ? .accent : .white)
+                    .frame(width: 32, height: 32)
             }
             
             Button {
-                //MARK: TODO
+                instrument = instrument == .instruments ? .none : .instruments
             } label: {
                 Image(.instruments)
+                    .renderingMode(.template)
+                    .foregroundStyle(instrument == .instruments ? .accent : .white)
+                    .frame(width: 32, height: 32)
             }
             
             Button {
-                //MARK: TODO
+                instrument = instrument == .color ? .none : .color
             } label: {
-                Image(.color)
+                Image(instrument == .color ? .colorSelected : .color)
+                    .frame(width: 32, height: 32)
             }
+            
         }
     }
     private var strokeStyle: StrokeStyle {
         StrokeStyle(lineWidth: lineWidth, lineCap: .round, lineJoin: .round, miterLimit: 0, dash: [], dashPhase: 0)
+    }
+    
+    
+    @State private var showMoreColors = false
+    
+    private var palette: some View {
+        
+        HStack(spacing: 16) {
+            Image(.pallete)
+                .renderingMode(.template)
+                .foregroundStyle(showMoreColors ? .accent : .white)
+            
+            ForEach(lastColors, id: \.self) { color in
+                Circle()
+                    .frame(width: 28, height: 28)
+                    .foregroundStyle(color)
+                    .padding(4)
+            }
+        }
+        .padding(16)
+        .background(
+            RoundedRectangle(cornerRadius: 4, style: .continuous)
+                .strokeBorder(.black.opacity(0.10), lineWidth: 1)
+                .background(
+                    RoundedRectangle(cornerRadius: 4)
+                        .fill(Color.black.opacity(0.14))
+                        .blur(radius: 10)
+                )
+            
+        )
+        .background(.ultraThinMaterial)
+        .clipShape(RoundedRectangle(cornerRadius: 4))
     }
 }
 
 
 #Preview {
     ContentView()
-        
+    
 }

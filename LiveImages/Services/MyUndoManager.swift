@@ -8,7 +8,7 @@
 import Observation
 
 @Observable
-class MyUndoManager {
+final class MyUndoManager {
     private var undoStack: [() -> Void] = []
     private var redoStack: [() -> Void] = []
     
