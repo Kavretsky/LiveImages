@@ -19,8 +19,8 @@ fileprivate enum Instument: String {
 struct ContentView: View {
     var frameStore: FrameStore = .init()
     @State private var lineWidth: CGFloat = 25
-    @State private var instrument: Instument = .instruments
-    @State private var selectedColor: Color = .red
+    @State private var instrument: Instument = .none
+    @State private var selectedColor: Color = .liveImagesBlue
     @State private var currentPath: [CGPoint] = []
     @State private var currentFrameIndex = 0
     
@@ -38,9 +38,11 @@ struct ContentView: View {
                 instrumentsView
                     .overlay(alignment: .bottom) {
                         
-                        if instrument != .none {
+                        if instrument == .color {
                             palette
                                 .padding(.bottom, 48)
+                                .transition(.blurReplace())
+                                .animation(.spring(), value: instrument)
                         }
                         
                         
@@ -158,7 +160,7 @@ struct ContentView: View {
                 
             }
             .gesture(
-                drawingGesture
+                drawingGesture, isEnabled: instrument == .pen || instrument == .eraser
             )
         }
         .clipShape(RoundedRectangle(cornerRadius: 16))
@@ -196,15 +198,11 @@ struct ContentView: View {
     
     @GestureState private var gestureState: (Bool, CGPoint) = (false, .zero)
     private var drawingGesture: some Gesture {
-        LongPressGesture(minimumDuration: 0, maximumDistance: 10).simultaneously(with: DragGesture(minimumDistance: 0, coordinateSpace: .local))
-            .updating($gestureState) { value, state, transaction in
-                guard instrument != .none else { return }
-                state.1 = value.second?.location ?? .zero
-                state.0 = value.first ?? false
-                currentPath.append(state.1)
-            }
+        LongPressGesture(minimumDuration: 0, maximumDistance: 10).simultaneously(with: DragGesture(minimumDistance: 0))
+            .onChanged({ value in
+                currentPath.append(value.second?.location ?? .zero)
+            })
             .onEnded{ value in
-                guard instrument != .none else { return }
                 let newPath = DrawingPath(points: currentPath, color: selectedColor, lineWidth: lineWidth, type: instrument == .eraser ? .erase : .fill)
                 frameStore.addPathWithUndo(newPath, to: currentFrameIndex, clearRedo: true)
                 currentPath = []
@@ -250,8 +248,14 @@ struct ContentView: View {
             Button {
                 instrument = instrument == .color ? .none : .color
             } label: {
-                Image(instrument == .color ? .colorSelected : .color)
-                    .frame(width: 32, height: 32)
+                ZStack {
+                    Circle()
+                        .foregroundStyle(.accent)
+                        .frame(width: 28, height: 28)
+                    Circle()
+                        .foregroundStyle(selectedColor)
+                        .frame(width: instrument == .color ? 26 : 28, height: instrument == .color ? 26 : 28)
+                }
             }
             
         }
