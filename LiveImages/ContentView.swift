@@ -23,13 +23,10 @@ struct ContentView: View {
     @State private var selectedColor: Color = .liveImagesBlue
     @State private var currentPath: [CGPoint] = []
     @State private var image: Image?
-    @Environment(\.displayScale) var displayScale
-    
-    @State private var lastColors: [Color] = [.white, .liveImagesOrange, .liveImagesBlack, .liveImagesBlue]
     
     var body: some View {
         ZStack {
-            Color(.liveImagesBlack)
+            Color(.origianlBlack)
                 .ignoresSafeArea()
             VStack {
                 headerView
@@ -44,7 +41,7 @@ struct ContentView: View {
                 instrumentsView
                     .overlay(alignment: .bottom) {
                         if instrument == .color {
-                            palette
+                            ChangeColorView(selectedColor: $selectedColor)
                                 .padding(.bottom, 48)
                                 .transition(.blurReplace())
                                 .animation(.spring(), value: instrument)
@@ -231,6 +228,7 @@ struct ContentView: View {
                 currentPath = []
             }
     }
+    
     @ViewBuilder
     private var instrumentsView: some View {
         if frameStore.isPlaying {
@@ -292,44 +290,7 @@ struct ContentView: View {
     private var strokeStyle: StrokeStyle {
         StrokeStyle(lineWidth: lineWidth, lineCap: .round, lineJoin: .round, miterLimit: 0, dash: [], dashPhase: 0)
     }
-    
-    
-    @State private var showMoreColors = false
-    
-    private var palette: some View {
-        
-        HStack(spacing: 16) {
-            Image(.pallete)
-                .renderingMode(.template)
-                .foregroundStyle(showMoreColors ? .accent : .white)
-            
-            ForEach(lastColors, id: \.self) { color in
-                Circle()
-                    .frame(width: 28, height: 28)
-                    .foregroundStyle(color)
-                    .padding(4)
-                    .onTapGesture {
-                        selectedColor = color
-                        
-                    }
-            }
-        }
-        .padding(16)
-        .background(
-            RoundedRectangle(cornerRadius: 4, style: .continuous)
-                .strokeBorder(.black.opacity(0.10), lineWidth: 1)
-                .background(
-                    RoundedRectangle(cornerRadius: 4)
-                        .fill(Color.black.opacity(0.14))
-                        .blur(radius: 10)
-                )
-            
-        )
-        .background(.ultraThinMaterial)
-        .clipShape(RoundedRectangle(cornerRadius: 4))
-    }
 }
-
 
 #Preview {
     ContentView()
