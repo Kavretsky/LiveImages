@@ -11,6 +11,7 @@ import SwiftUI
 struct DrawingFrame: Identifiable, Equatable {
     let id = UUID().uuidString
     var name: String
+    var didChanged = false
     var image: Image?
     var pathHead: PathNode? {
         dummy.next
@@ -22,13 +23,15 @@ struct DrawingFrame: Identifiable, Equatable {
     }
     private var dummy = PathNode()
     
-    func appendPath(_ node: PathNode) {
+    mutating func appendPath(_ node: PathNode) {
         node.next = dummy.next
         dummy.next = node
+        didChanged = true
     }
     
-    func removeFirst() {
+    mutating func removeFirst() {
         dummy.next = dummy.next?.next
+        didChanged = true
     }
     
     static func == (lhs: DrawingFrame, rhs: DrawingFrame) -> Bool {

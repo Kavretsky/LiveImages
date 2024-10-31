@@ -7,7 +7,7 @@
 
 import SwiftUI
 
-fileprivate enum Instument: String {
+enum Instument: String {
     case pen = "Pen"
     case eraser = "Eraser"
     case brush = "Brush"
@@ -25,32 +25,39 @@ struct ContentView: View {
     @State private var image: Image?
     
     var body: some View {
-        ZStack {
-            Color(.origianlBlack)
-                .ignoresSafeArea()
-            VStack {
-                headerView
-                Spacer(minLength: 32)
-                if frameStore.isPlaying {
-                    animatableArea
-                } else {
-                    drawingArea
-                }
-                Spacer(minLength: 22)
-                
-                instrumentsView
-                    .overlay(alignment: .bottom) {
-                        if instrument == .color {
-                            ChangeColorView(selectedColor: $selectedColor)
-                                .padding(.bottom, 48)
-                                .transition(.blurReplace())
-                                .animation(.spring(), value: instrument)
-                        }
+            ZStack {
+                Color(.origianlBlack)
+                    .ignoresSafeArea()
+                VStack(spacing: 8) {
+                    if frameStore.isFrameLineShowing {
+                        frameLineView
+                    } else {
+                        headerView
+                        Spacer(minLength: 24)
                     }
-                
+                    if frameStore.isPlaying {
+                        animatableArea
+                    } else {
+                        drawingArea
+                            .onAppear {
+                                
+                            }
+                    }
+                    Spacer(minLength: 22)
+                    
+                    instrumentsView
+                        .overlay(alignment: .bottom) {
+                            if instrument == .color {
+                                ChangeColorView(selectedColor: $selectedColor)
+                                    .padding(.bottom, 48)
+                                    .transition(.blurReplace())
+                                    .animation(.spring(), value: instrument)
+                            }
+                        }
+                    
+                }
+                .padding(16)
             }
-            .padding(16)
-        }
     }
     
     private var headerView: some View {
@@ -95,7 +102,7 @@ struct ContentView: View {
             }
             
             Button {
-                //MARK: TODO
+                frameStore.toggleFrameLine()
             } label: {
                 Image(.layers)
             }
@@ -116,15 +123,14 @@ struct ContentView: View {
             } label: {
                 Image(frameStore.frames.count > 1 ? .playActive : .playUnactive)
             }
-            
-            
         }
     }
     
-    
-    
     private func canvas(for frameIndex: Int) -> some View {
         Canvas(colorMode: .nonLinear, rendersAsynchronously: false) { context, size in
+            if frameStore.canvasSize == nil {
+                frameStore.canvasSize = size
+            }
             let savedContext = context
             if instrument == .eraser && frameIndex == frameStore.currentFrameIndex {
                 if currentPath.count != 1 {
@@ -164,16 +170,16 @@ struct ContentView: View {
     
     private var animatableArea: some View {
         ZStack {
-            Image(.whiteboard)
+            Image(.canvasBackground)
                 .resizable()
-            canvas(for: frameStore.animationFrameIndex)
+            frameStore.frames[frameStore.animationFrameIndex].image
         }
-        .clipShape(RoundedRectangle(cornerRadius: 16))
+        .clipShape(RoundedRectangle(cornerRadius: 20))
     }
     
     private var drawingArea: some View {
         ZStack {
-            Image(.whiteboard)
+            Image(.canvasBackground)
                 .resizable()
             if frameStore.currentFrameIndex > 0 {
                 canvas(for: frameStore.currentFrameIndex - 1)
@@ -184,7 +190,7 @@ struct ContentView: View {
                     drawingGesture, isEnabled: instrument == .pen || instrument == .eraser
                 )
         }
-        .clipShape(RoundedRectangle(cornerRadius: 16))
+        .clipShape(RoundedRectangle(cornerRadius: 20))
     }
     
     private func drawPath(_ drawingPath: PathNode, in context: inout GraphicsContext) {
@@ -287,10 +293,56 @@ struct ContentView: View {
             }
         }
     }
+    
+    private var frameLineView: some View {
+        HStack(spacing: 0) {
+            Button {
+                frameStore.toggleFrameLine()
+            } label: {
+                Image(systemName: "xmark.circle")
+                    .fontWidth(.expanded)
+                    .tint(.white)
+                    .font(.title)
+            }
+            .padding(.horizontal, 12)
+            ScrollView(.horizontal) {
+                LazyHStack(spacing: 3) {
+                    ForEach(0..<frameStore.frames.count, id: \.self) { index in
+                        ZStack {
+                            Image(.canvasBackground)
+                                .resizable()
+                                .frame(width: 64 * frameStore.canvasAspectRation, height: 64)
+                            if frameStore.frames[index].image != nil {
+                                frameStore.frames[index].image!
+                                    .resizable()
+                                    .frame(width: 64 * frameStore.canvasAspectRation, height: 64)
+                            } else {
+                                ProgressView()
+                                    .onAppear {
+                                        frameStore.updateImage(for: index)
+                                    }
+                            }
+                            
+                        }
+                        
+                        .border(.accent, width: index == frameStore.currentFrameIndex ? 2 : 0)
+                        .clipShape(RoundedRectangle(cornerRadius: 2))
+                        .onTapGesture {
+                            frameStore.changeFrame(to: index)
+                        }
+                    }
+                }
+            }
+        }
+        .frame(height: 64)
+    }
+    
     private var strokeStyle: StrokeStyle {
         StrokeStyle(lineWidth: lineWidth, lineCap: .round, lineJoin: .round, miterLimit: 0, dash: [], dashPhase: 0)
     }
 }
+
+
 
 #Preview {
     ContentView()
