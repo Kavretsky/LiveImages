@@ -28,12 +28,13 @@ struct ContentView: View {
             ZStack {
                 Color(.origianlBlack)
                     .ignoresSafeArea()
-                VStack(spacing: 8) {
+                VStack(spacing: 0) {
                     if frameStore.isFrameLineShowing {
                         frameLineView
+                        Spacer(minLength: 8)
                     } else {
                         headerView
-                        Spacer(minLength: 24)
+                        Spacer(minLength: 32)
                     }
                     if frameStore.isPlaying {
                         animatableArea
@@ -43,7 +44,7 @@ struct ContentView: View {
                                 
                             }
                     }
-                    Spacer(minLength: 22)
+                    Spacer(minLength: 24)
                     
                     instrumentsView
                         .overlay(alignment: .bottom) {
@@ -106,16 +107,63 @@ struct ContentView: View {
             } label: {
                 Image(.layers)
             }
-            
+            frameMenu
         }
+    }
+    
+    private var frameMenu: some View {
+        Menu {
+            Button {
+                frameStore.duplicateFrame()
+            } label: {
+                Label {
+                    Text("Duplicate")
+                } icon: {
+                    Image(.duplicate)
+                        .renderingMode(.template)
+                }
+
+                
+            }
+            Button {
+                //TODO: generate
+            } label: {
+                Label {
+                    Text("Generate")
+                } icon: {
+                    Image(systemName: "timelapse")
+                }
+            }
+            Divider()
+            Button(role: .destructive) {
+                //TODO: remove all
+            } label: {
+                Label {
+                    Text("Remove all")
+                } icon: {
+                    Image(.removeAll)
+                        .renderingMode(.template)
+                }
+            }
+            
+        } label: {
+            Image(systemName: "ellipsis")
+                .font(.title2)
+                .foregroundStyle(.white)
+                .frame(width: 32, height: 32)
+        }
+
+
     }
     
     private var playControls: some View {
         HStack(spacing: 16) {
-            Button {
-                frameStore.stopPlay()
-            } label: {
-                Image(frameStore.isPlaying ? .pauseActive : .pauseUnactive)
+            if frameStore.isPlaying {
+                Button {
+                    frameStore.stopPlay()
+                } label: {
+                    Image(frameStore.isPlaying ? .pauseActive : .pauseUnactive)
+                }
             }
             Button {
                 instrument = .none
@@ -123,6 +171,7 @@ struct ContentView: View {
             } label: {
                 Image(frameStore.frames.count > 1 ? .playActive : .playUnactive)
             }
+            
         }
     }
     
@@ -166,6 +215,7 @@ struct ContentView: View {
             }
             
         }
+        
     }
     
     private var animatableArea: some View {
@@ -294,6 +344,7 @@ struct ContentView: View {
         }
     }
     
+    
     private var frameLineView: some View {
         HStack(spacing: 0) {
             Button {
@@ -311,11 +362,11 @@ struct ContentView: View {
                         ZStack {
                             Image(.canvasBackground)
                                 .resizable()
-                                .frame(width: 64 * frameStore.canvasAspectRation, height: 64)
+                                .frame(width: 56 * frameStore.canvasAspectRation, height: 56)
                             if frameStore.frames[index].image != nil {
                                 frameStore.frames[index].image!
                                     .resizable()
-                                    .frame(width: 64 * frameStore.canvasAspectRation, height: 64)
+                                    .frame(width: 56 * frameStore.canvasAspectRation, height: 56)
                             } else {
                                 ProgressView()
                                     .onAppear {
@@ -328,15 +379,14 @@ struct ContentView: View {
                         .border(.accent, width: index == frameStore.currentFrameIndex ? 2 : 0)
                         .clipShape(RoundedRectangle(cornerRadius: 2))
                         .onTapGesture {
-                            frameStore.changeFrame(to: index)
+                            frameStore.changeCurrentFrame(to: index)
                         }
                     }
                 }
             }
         }
-        .frame(height: 64)
+        .frame(height: 56)
     }
-    
     private var strokeStyle: StrokeStyle {
         StrokeStyle(lineWidth: lineWidth, lineCap: .round, lineJoin: .round, miterLimit: 0, dash: [], dashPhase: 0)
     }

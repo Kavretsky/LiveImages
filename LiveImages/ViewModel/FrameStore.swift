@@ -13,11 +13,8 @@ import SwiftUI
 final class FrameStore {
     private(set) var frames: [DrawingFrame] = [.init(name: "Frame 1")]
     private let undoManager = MyUndoManager()
-    private(set) var isPlaying: Bool = false
-    private(set) var animationFrameIndex = 0
+    
     private(set) var currentFrameIndex = 0
-    private(set) var isFrameLineShowing = false
-    private var timer: Timer = Timer()
     
     var canvasSize: CGSize?
     
@@ -29,47 +26,22 @@ final class FrameStore {
         }
     }
     
-    func changeFrame(to index: Int) {
+    //MARK: Frame intents
+    func changeCurrentFrame(to index: Int) {
         guard index >= 0, index < frames.count, index != currentFrameIndex else { return }
         renderImage(for: currentFrameIndex)
         currentFrameIndex = index
     }
     
-    func toggleFrameLine() {
-        if !isFrameLineShowing {
-            renderImage(for: currentFrameIndex)
-        }
-        isFrameLineShowing.toggle()
-    }
-    
-    func updateImage(for index: Int) {
-        renderImage(for: index)
-    }
-    
     func removeFrame() {
-        clearCurrent()
+        clearCurrentFrame()
         if currentFrameIndex > 0 {
             currentFrameIndex -= 1
             frames.remove(at: currentFrameIndex + 1)
         }
     }
     
-    func startPlay() {
-        guard frames.count > 1 else { return }
-        renderImage(for: currentFrameIndex)
-        isPlaying = true
-        timer.invalidate()
-        animationFrameIndex = 0
-        startTimer()
-    }
-    
-    func stopPlay() {
-        isPlaying = false
-        timer.invalidate()
-        animationFrameIndex = 0
-    }
-    
-    private func clearCurrent() {
+    private func clearCurrentFrame() {
         undoManager.clearStack(for: frames[currentFrameIndex].id)
         frames[currentFrameIndex] = .init(name: "Frame \(frames.count)")
     }
@@ -79,14 +51,36 @@ final class FrameStore {
             frames.append(.init(name: "Frame \(frames.count + 1)"))
         }
         renderImage(for: currentFrameIndex)
-        currentFrameIndex += 1
+        changeCurrentFrame(to: currentFrameIndex + 1)
     }
     
+    func duplicateFrame() {
+        var copy = DrawingFrame(name: frames[currentFrameIndex].name + "Duplicate")
+        var head = frames[currentFrameIndex].pathHead
+        var newPaths: [PathNode] = []
+        while let path = head {
+            let pathCopy = PathNode(erasePath: path.erasePath, next: nil, drawingPaths: path.drawingPaths)
+            newPaths.append(pathCopy)
+            head = path.next
+        }
+        var index = newPaths.count - 1
+        while index >= 0 {
+            copy.appendPath(newPaths[index])
+            index -= 1
+        }
+        copy.image = frames[currentFrameIndex].image
+        if currentFrameIndex + 1 == frames.count  {
+            frames.append(copy)
+        } else {
+            frames.insert(copy, at: currentFrameIndex + 1)
+        }
+        
+        changeCurrentFrame(to: currentFrameIndex + 1)
+    }
+    
+    //MARK: Path intents
     private func addPath(_ path: DrawingPath, to frameIndex: Int) {
         guard frameIndex < frames.count, frameIndex >= 0 else { return }
-        
-        
-        
         guard frames[frameIndex].pathHead != nil else {
             let nextPath = PathNode(erasePath: path.type == .erase ? path : nil, drawingPaths: path.type == .erase ? [] : [path])
             frames[frameIndex].appendPath(nextPath)
@@ -127,9 +121,10 @@ final class FrameStore {
         }
     }
     
+    //MARK: UndoManager
     func addPathWithUndo(_ path: DrawingPath, clearRedo: Bool = false) {
         addPath(path, to: currentFrameIndex)
-        
+        frames[currentFrameIndex].didChanged = true
         
         
         undoManager.registerUndo(frameID: frames[currentFrameIndex].id, removePrevious: clearRedo) { [weak self] in
@@ -142,6 +137,7 @@ final class FrameStore {
     
     private func removePathWithUndo(_ path: DrawingPath) {
         removePath(path, from: currentFrameIndex)
+        frames[currentFrameIndex].didChanged = true
         undoManager.registerRedu(frameID: frames[currentFrameIndex].id) { [weak self] in
             self?.addPathWithUndo(path)
         }
@@ -163,6 +159,26 @@ final class FrameStore {
         undoManager.redo(for: frames[currentFrameIndex].id)
     }
     
+    //MARK: Frame Animation
+    private(set) var isPlaying: Bool = false
+    private(set) var animationFrameIndex = 0
+    private var timer: Timer = Timer()
+    
+    func startPlay() {
+        guard frames.count > 1 else { return }
+        renderImage(for: currentFrameIndex)
+        isPlaying = true
+        timer.invalidate()
+        animationFrameIndex = 0
+        startTimer()
+    }
+    
+    func stopPlay() {
+        isPlaying = false
+        timer.invalidate()
+        animationFrameIndex = 0
+    }
+    
     private var framePerSecond: Int = 1
     private func startTimer() {
         timer = Timer.scheduledTimer(withTimeInterval: 1.0 / Double(framePerSecond), repeats: true) { [weak self] _ in
@@ -171,6 +187,28 @@ final class FrameStore {
         }
     }
     
+    
+    //MARK: RenderImage
+    private func renderImage(for index: Int) {
+        guard index >= 0, index < frames.count else { return }
+        guard frames[index].image == nil || frames[index].didChanged else { return }
+        frames[index].image = nil
+        Task.detached { [weak self] in
+            guard let self, let canvasSize else { return }
+            let renderer = UIGraphicsImageRenderer(size: canvasSize)
+            let image = renderer.image { ctx in
+                var context = ctx.cgContext
+                context.setLineCap(.round)
+                
+                if let head = self.frames[index].pathHead {
+                    self.drawPath(head, in: &context)
+                }
+            }
+            frames[index].image = Image(uiImage: image)
+            frames[index].didChanged = false
+        }
+        
+    }
     
     private func drawPath(_ drawingPath: PathNode, in context: inout CGContext) {
         context.setLineJoin(.round)
@@ -215,27 +253,6 @@ final class FrameStore {
         }
     }
     
-    private func renderImage(for index: Int) {
-        guard index >= 0, index < frames.count else { return }
-        guard frames[index].image == nil || frames[index].didChanged else { return }
-        frames[index].image = nil
-        Task.detached { [weak self] in
-            guard let self, let canvasSize else { return }
-            let renderer = UIGraphicsImageRenderer(size: canvasSize)
-            let image = renderer.image { ctx in
-                var context = ctx.cgContext
-                context.setLineCap(.round)
-                
-                if let head = self.frames[index].pathHead {
-                    self.drawPath(head, in: &context)
-                }
-            }
-            frames[index].image = Image(uiImage: image)
-            frames[index].didChanged = false
-        }
-        
-    }
-    
     private func createInverseMask(from path: DrawingPath, size: CGSize, lineWidth: CGFloat) -> UIImage {
         let renderer = UIGraphicsImageRenderer(size: size)
         
@@ -260,6 +277,20 @@ final class FrameStore {
             cgContext.addPath(erasePath)
             cgContext.strokePath()
         }
+    }
+    
+    //MARK: FrameLine
+    private(set) var isFrameLineShowing = false
+    
+    func toggleFrameLine() {
+        if !isFrameLineShowing {
+            renderImage(for: currentFrameIndex)
+        }
+        isFrameLineShowing.toggle()
+    }
+    
+    func updateImage(for index: Int) {
+        renderImage(for: index)
     }
     
 }
