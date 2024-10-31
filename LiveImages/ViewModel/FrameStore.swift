@@ -13,7 +13,7 @@ import SwiftUI
 final class FrameStore {
     private(set) var frames: [DrawingFrame] = [.init(name: "Frame 1")]
     private let undoManager = MyUndoManager()
-    
+    private(set) var showProgress = false
     private(set) var currentFrameIndex = 0
     
     var canvasSize: CGSize?
@@ -39,6 +39,14 @@ final class FrameStore {
             currentFrameIndex -= 1
             frames.remove(at: currentFrameIndex + 1)
         }
+    }
+    
+    func removeAllFrames() {
+        showProgress = true
+        currentFrameIndex = 0
+        frames = [.init(name: "Frame 1")]
+        undoManager.dropAll()
+        showProgress = false
     }
     
     private func clearCurrentFrame() {

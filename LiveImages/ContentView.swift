@@ -28,36 +28,44 @@ struct ContentView: View {
             ZStack {
                 Color(.origianlBlack)
                     .ignoresSafeArea()
-                VStack(spacing: 0) {
-                    if frameStore.isFrameLineShowing {
-                        frameLineView
-                        Spacer(minLength: 8)
-                    } else {
-                        headerView
-                        Spacer(minLength: 32)
-                    }
-                    if frameStore.isPlaying {
-                        animatableArea
-                    } else {
-                        drawingArea
-                            .onAppear {
-                                
-                            }
-                    }
-                    Spacer(minLength: 24)
-                    
-                    instrumentsView
-                        .overlay(alignment: .bottom) {
-                            if instrument == .color {
-                                ChangeColorView(selectedColor: $selectedColor)
-                                    .padding(.bottom, 48)
-                                    .transition(.blurReplace())
-                                    .animation(.spring(), value: instrument)
-                            }
+                if frameStore.showProgress {
+                    ProgressView()
+                } else {
+                    VStack(spacing: 0) {
+                        if frameStore.isFrameLineShowing {
+                            frameLineView
+                            Spacer(minLength: 8)
+                        } else {
+                            headerView
+                            Spacer(minLength: 32)
                         }
-                    
+                        if frameStore.isPlaying {
+                            animatableArea
+                        } else {
+                            drawingArea
+                                .onAppear {
+                                    
+                                }
+                        }
+                        Spacer(minLength: 24)
+                        instrumentsView
+                            .overlay(alignment: .bottom) {
+                                if instrument == .color {
+                                    ChangeColorView(selectedColor: $selectedColor)
+                                        .padding(.bottom, 48)
+                                        .transition(.blurReplace())
+                                        .animation(.spring(), value: instrument)
+                                }
+                            }
+                        
+                    }
+                    .padding(16)
                 }
-                .padding(16)
+            }
+            .alert("Are you sure to delete all frames?", isPresented: $showDeleteAllAlert) {
+                Button("Delete All", role: .destructive) {
+                    frameStore.removeAllFrames()
+                }
             }
     }
     
@@ -111,6 +119,8 @@ struct ContentView: View {
         }
     }
     
+    @State private var showDeleteAllAlert: Bool = false
+    
     private var frameMenu: some View {
         Menu {
             Button {
@@ -136,7 +146,7 @@ struct ContentView: View {
             }
             Divider()
             Button(role: .destructive) {
-                //TODO: remove all
+                showDeleteAllAlert = true
             } label: {
                 Label {
                     Text("Remove all")
@@ -152,8 +162,6 @@ struct ContentView: View {
                 .foregroundStyle(.white)
                 .frame(width: 32, height: 32)
         }
-
-
     }
     
     private var playControls: some View {
@@ -387,6 +395,7 @@ struct ContentView: View {
         }
         .frame(height: 56)
     }
+    
     private var strokeStyle: StrokeStyle {
         StrokeStyle(lineWidth: lineWidth, lineCap: .round, lineJoin: .round, miterLimit: 0, dash: [], dashPhase: 0)
     }

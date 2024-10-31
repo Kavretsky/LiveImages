@@ -45,5 +45,10 @@ final class MyUndoManager {
         redoStackHash[frameID] = []
     }
     
+    func dropAll() {
+        undoStackHash.removeAll()
+        redoStackHash.removeAll()
+    }
+    
     
 }
