@@ -43,9 +43,6 @@ struct ContentView: View {
                             animatableArea
                         } else {
                             drawingArea
-                                .onAppear {
-                                    
-                                }
                         }
                         Spacer(minLength: 24)
                         instrumentsView
@@ -75,6 +72,8 @@ struct ContentView: View {
                 undoRedoView
                 Spacer()
                 frameManagerView
+            } else {
+                playSpeedView
             }
             Spacer()
             playControls
@@ -183,6 +182,31 @@ struct ContentView: View {
         }
     }
     
+    @State private var playSpeed = 1.0
+    
+    private var playSpeedView: some View {
+        
+        Menu {
+            Button {
+                playSpeed = 1.0
+                frameStore.setFramePerSecond(playSpeed)
+            } label: {
+                Text("1 frame per second")
+            }
+            ForEach(1...6, id: \.self) { i in
+                Button {
+                    playSpeed = Double(5 * i)
+                    frameStore.setFramePerSecond(playSpeed)
+                } label: {
+                    Text("\(5 * i) frame per second")
+                }
+            }
+            
+        } label: {
+            Label("FPS: \(Int(playSpeed))", systemImage: "goforward")
+        }
+    }
+    
     private func canvas(for frameIndex: Int) -> some View {
         Canvas(colorMode: .nonLinear, rendersAsynchronously: false) { context, size in
             if frameStore.canvasSize == nil {
@@ -255,8 +279,8 @@ struct ContentView: View {
         if let toErase = drawingPath.erasePath {
             var path = Path()
             path.addLines(toErase.points)
-            context.clipToLayer(options: .inverse){ clipedContext in
-                clipedContext.stroke(path, with: .color(toErase.color), style: strokeStyle)
+            context.clipToLayer(options: .inverse){ clippedContext in
+                clippedContext.stroke(path, with: .color(toErase.color), style: strokeStyle)
             }
         }
         if let next = drawingPath.next {
@@ -381,9 +405,7 @@ struct ContentView: View {
                                         frameStore.updateImage(for: index)
                                     }
                             }
-                            
                         }
-                        
                         .border(.accent, width: index == frameStore.currentFrameIndex ? 2 : 0)
                         .clipShape(RoundedRectangle(cornerRadius: 2))
                         .onTapGesture {

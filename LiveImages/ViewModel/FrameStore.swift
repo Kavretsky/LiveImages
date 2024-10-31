@@ -63,6 +63,7 @@ final class FrameStore {
     }
     
     func duplicateFrame() {
+        showProgress = true
         var copy = DrawingFrame(name: frames[currentFrameIndex].name + "Duplicate")
         var head = frames[currentFrameIndex].pathHead
         var newPaths: [PathNode] = []
@@ -84,6 +85,7 @@ final class FrameStore {
         }
         
         changeCurrentFrame(to: currentFrameIndex + 1)
+        showProgress = false
     }
     
     //MARK: Path intents
@@ -187,12 +189,19 @@ final class FrameStore {
         animationFrameIndex = 0
     }
     
-    private var framePerSecond: Int = 1
+    private var framePerSecond: Double = 1.0
     private func startTimer() {
+        timer.invalidate()
         timer = Timer.scheduledTimer(withTimeInterval: 1.0 / Double(framePerSecond), repeats: true) { [weak self] _ in
             guard let self else { return }
             animationFrameIndex = (animationFrameIndex + 1) % frames.count
         }
+    }
+    
+    func setFramePerSecond(_ framePerSecond: Double) {
+        guard framePerSecond > 0 else { return }
+        self.framePerSecond = framePerSecond
+        startTimer()
     }
     
     
