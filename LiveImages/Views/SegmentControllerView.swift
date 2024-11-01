@@ -10,7 +10,7 @@ import SwiftUI
 
 enum SegmentControllerSelection: String, CaseIterable {
     case palette = "Palette"
-    case manual = "Manual Mode"
+    case manual = "Manual"
 }
 
 struct SegmentControllerView: View {
@@ -27,8 +27,10 @@ struct SegmentControllerView: View {
                         }
                     }
                     .animation(.interactiveSpring(response: 0.3, dampingFraction: 0.9, blendDuration: 1), value: selected)
+                    .zIndex(element == selected ? 1 : 0)
             }
         }
+        .padding(4)
         .background {
             Capsule()
                 .fill(Color(.white))
@@ -38,9 +40,10 @@ struct SegmentControllerView: View {
     
     func itemView(for element: SegmentControllerSelection) -> some View {
         Text(element.rawValue)
+            .foregroundStyle(element == selected ? .white : .black)
             .font(.headline)
             .padding(.horizontal, 16)
-            .padding(.vertical, 12)
+            .padding(.vertical, 8)
             .background {
                 if selected == element {
                     Capsule()

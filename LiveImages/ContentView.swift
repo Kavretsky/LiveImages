@@ -13,12 +13,13 @@ enum Instument: String {
     case brush = "Brush"
     case color = "Color"
     case instruments = "Instruments"
+    case linewidth = "Width"
     case none
 }
 
 struct ContentView: View {
     var frameStore: FrameStore = .init()
-    @State private var lineWidth: CGFloat = 25
+    @State private var lineWidth: CGFloat = 10
     @State private var instrument: Instument = .none
     @State private var selectedColor: Color = .liveImagesBlue
     @State private var currentPath: [CGPoint] = []
@@ -52,6 +53,12 @@ struct ContentView: View {
                                         .padding(.bottom, 48)
                                         .transition(.blurReplace())
                                         .animation(.spring(), value: instrument)
+                                }
+                                if instrument == .linewidth {
+                                    LineWidthEditor(lineWidth: $lineWidth)
+                                        .padding(16)
+                                        .overlayBase()
+                                        .padding(.bottom, 48)
                                 }
                             }
                         
@@ -218,7 +225,7 @@ struct ContentView: View {
                     var currentDrawingPath = Path()
                     currentDrawingPath.addLines(currentPath)
                     context.clipToLayer(options: .inverse) { layerContext in
-                        layerContext.stroke(currentDrawingPath, with: .color(selectedColor), style: strokeStyle)
+                        layerContext.stroke(currentDrawingPath, with: .color(selectedColor), style: strokeStyle(with: lineWidth))
                     }
                 } else {
                     let path = Path(ellipseIn: CGRect(x: currentPath[0].x - lineWidth / 2, y: currentPath[0].y - lineWidth / 2, width: lineWidth, height: lineWidth))
@@ -238,7 +245,7 @@ struct ContentView: View {
                     var currentDrawingPath = Path()
                     currentDrawingPath.addLines(currentPath)
                     savedContext.drawLayer { layerContext in
-                        layerContext.stroke(currentDrawingPath, with: .color(selectedColor), style: strokeStyle)
+                        layerContext.stroke(currentDrawingPath, with: .color(selectedColor), style: strokeStyle(with: lineWidth))
                     }
                 } else {
                     let path = Path(ellipseIn: CGRect(x: currentPath[0].x - lineWidth / 2, y: currentPath[0].y - lineWidth / 2, width: lineWidth, height: lineWidth))
@@ -280,7 +287,7 @@ struct ContentView: View {
             var path = Path()
             path.addLines(toErase.points)
             context.clipToLayer(options: .inverse){ clippedContext in
-                clippedContext.stroke(path, with: .color(toErase.color), style: strokeStyle)
+                clippedContext.stroke(path, with: .color(toErase.color), style: strokeStyle(with: toErase.lineWidth))
             }
         }
         if let next = drawingPath.next {
@@ -297,7 +304,7 @@ struct ContentView: View {
             var currentDrawingPath = Path()
             currentDrawingPath.addLines(path.points)
             context.drawLayer { layerContext in
-                layerContext.stroke(currentDrawingPath, with: .color(path.color), style: strokeStyle)
+                layerContext.stroke(currentDrawingPath, with: .color(path.color), style: strokeStyle(with: path.lineWidth))
             }
         } else {
             let ellipsePath = Path(ellipseIn: CGRect(x: path.points[0].x - path.lineWidth / 2, y: path.points[0].y - path.lineWidth / 2, width: path.lineWidth, height: path.lineWidth))
@@ -317,13 +324,37 @@ struct ContentView: View {
             }
     }
     
+    private var fontWeight: Font.Weight {
+        switch lineWidth {
+        case 0...10: .thin
+        case 10...20: .medium
+        case 20...30: .semibold
+        case 30...40: .bold
+        default: .heavy
+        }
+    }
+    
     @ViewBuilder
     private var instrumentsView: some View {
         if frameStore.isPlaying {
             Color.clear
                 .frame(height: 32)
         } else {
-            HStack(spacing: 21) {
+            HStack(spacing: 16) {
+//                Button {
+//                    instrument = instrument == .linewidth ? .none : .linewidth
+//                } label: {
+                    Image(systemName: "scribble.variable")
+                        .font(.system(size: 20))
+                        .foregroundStyle(instrument == .linewidth ? .accent : .white)
+                        .fontWeight(
+                            fontWeight
+                        )
+                        .frame(width: 32, height: 32)
+                        .onTapGesture {
+                            instrument = instrument == .linewidth ? .none : .linewidth
+                        }
+//                }
                 Image(.pencil)
                     .renderingMode(.template)
                     .foregroundStyle(instrument == .pen ? .accent : .white)
@@ -418,7 +449,7 @@ struct ContentView: View {
         .frame(height: 56)
     }
     
-    private var strokeStyle: StrokeStyle {
+    private func strokeStyle(with lineWidth: CGFloat) -> StrokeStyle {
         StrokeStyle(lineWidth: lineWidth, lineCap: .round, lineJoin: .round, miterLimit: 0, dash: [], dashPhase: 0)
     }
 }

@@ -122,8 +122,7 @@ struct RGBColorPicker: View {
                     color = colorCreator(max(0, min(sliderOffsetChange.wrappedValue + sliderOffset.wrappedValue, sliderWidth - circleRadius)) / (sliderWidth - circleRadius))
                 })
                 .onEnded({ value in
-                    print(sliderOffset, sliderOffsetChange)
-                    sliderOffset.wrappedValue += sliderOffsetChange.wrappedValue
+                    sliderOffset.wrappedValue = max(0, min(sliderOffset.wrappedValue + sliderOffsetChange.wrappedValue, sliderWidth - circleRadius))
                     sliderOffsetChange.wrappedValue = 0
                 })
         )

@@ -70,7 +70,6 @@ struct ChangeColorView: View {
                 }
             } else {
                 RGBColorPicker(color: $selectedColor, components: selectedColor.resolve(in: environment))
-                
             }
         }
         .padding(16)
