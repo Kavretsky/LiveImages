@@ -211,13 +211,20 @@ final class FrameStore {
         guard index >= 0, index < frames.count else { return }
         guard frames[index].image == nil || frames[index].didChanged else { return }
         frames[index].image = nil
-        Task.detached { [weak self] in
+        Task { [weak self] in
             guard let self, let canvasSize else { return }
             let renderer = UIGraphicsImageRenderer(size: canvasSize)
             let image = renderer.image { ctx in
                 var context = ctx.cgContext
                 context.setLineCap(.round)
+                context.saveGState()
+                context.translateBy(x: 0, y: canvasSize.height)
+                context.scaleBy(x: 1, y: -1)
                 
+                if let image = UIImage(resource: .canvasBackground).cgImage {
+                    context.draw(image, in: .init(origin: .zero, size: canvasSize), byTiling: false)
+                }
+                context.restoreGState()
                 if let head = self.frames[index].pathHead {
                     self.drawPath(head, in: &context)
                 }

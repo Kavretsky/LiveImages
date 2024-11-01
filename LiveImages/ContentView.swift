@@ -273,11 +273,12 @@ struct ContentView: View {
     
     private var animatableArea: some View {
         ZStack {
-            Image(.canvasBackground)
-                .resizable()
+            
             if let uiImage = frameStore.frames[frameStore.animationFrameIndex].image {
                 Image(uiImage: uiImage)
             } else {
+                Image(.canvasBackground)
+                    .resizable()
                 canvas(for: frameStore.animationFrameIndex)
             }
             
@@ -442,14 +443,15 @@ struct ContentView: View {
                 LazyHStack(spacing: 3) {
                     ForEach(0..<frameStore.frames.count, id: \.self) { index in
                         ZStack {
-                            Image(.canvasBackground)
-                                .resizable()
-                                .frame(width: 56 * frameStore.canvasAspectRation, height: 56)
+                            
                             if let image = frameStore.frames[index].image{
                                 Image(uiImage: image)
                                     .resizable()
                                     .frame(width: 56 * frameStore.canvasAspectRation, height: 56)
                             } else {
+                                Image(.canvasBackground)
+                                    .resizable()
+                                    .frame(width: 56 * frameStore.canvasAspectRation, height: 56)
                                 ProgressView()
                                     .onAppear {
                                         frameStore.updateImage(for: index)
