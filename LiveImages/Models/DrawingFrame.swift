@@ -12,7 +12,7 @@ struct DrawingFrame: Identifiable, Equatable {
     let id = UUID().uuidString
     var name: String
     var didChanged = false
-    var image: Image?
+    var image: UIImage?
     var pathHead: PathNode? {
         dummy.next
     }

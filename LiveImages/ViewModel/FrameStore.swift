@@ -8,6 +8,7 @@
 import Foundation
 import Observation
 import SwiftUI
+import UniformTypeIdentifiers
 
 @Observable
 final class FrameStore {
@@ -221,7 +222,8 @@ final class FrameStore {
                     self.drawPath(head, in: &context)
                 }
             }
-            frames[index].image = Image(uiImage: image)
+            frames[index].image = image
+            
             frames[index].didChanged = false
         }
         
@@ -308,6 +310,66 @@ final class FrameStore {
     
     func updateImage(for index: Int) {
         renderImage(for: index)
+    }
+    
+    
+    //MARK: GIF
+    private(set) var gifURL: URL?
+    private var createGifTask: Task<Void, Error>?
+    
+    private enum CreateGifError: Error {
+        case noCacheDirectory
+        case noImageDestination
+    }
+    
+    private func gifGenerator() async throws -> URL {
+        guard let directory = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first else {
+            throw CreateGifError.noCacheDirectory
+        }
+        if let gifURL {
+            try FileManager.default.removeItem(at: gifURL)
+        }
+        
+        let fileName = "madeyourself.gif"
+        let fileURL = directory.appendingPathComponent(fileName)
+        let loopProperty = [kCGImagePropertyGIFDictionary : [
+            kCGImagePropertyGIFLoopCount : 0]] as CFDictionary
+        guard let destination = CGImageDestinationCreateWithURL(fileURL as CFURL, UTType.gif.identifier as CFString, frames.count, nil) else {
+            throw CreateGifError.noImageDestination
+        }
+        
+        CGImageDestinationSetProperties(destination, loopProperty)
+        let frameProperties = [
+            kCGImagePropertyGIFDictionary : [
+                kCGImagePropertyGIFDelayTime : 1.0 / framePerSecond
+            ]
+        ] as CFDictionary
+        
+        var index = 0
+        while index < frames.count  {
+            try Task.checkCancellation()
+            guard let image = frames[index].image?.cgImage else {
+                index += 1
+                continue
+            }
+            CGImageDestinationAddImage(destination, image, frameProperties)
+            index += 1
+        }
+        
+        CGImageDestinationFinalize(destination)
+        
+        return fileURL
+    }
+    
+    func createGIF() {
+        if createGifTask != nil {
+            createGifTask?.cancel()
+        }
+        renderImage(for: currentFrameIndex)
+        createGifTask = Task(priority: .userInitiated) {
+            async let url = gifGenerator()
+            gifURL = try await url
+        }
     }
     
 }

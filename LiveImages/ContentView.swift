@@ -150,6 +150,20 @@ struct ContentView: View {
                     Image(systemName: "timelapse")
                 }
             }
+            
+            Button {
+                frameStore.createGIF()
+            } label: {
+                Label {
+                    Text("Create GIF")
+                } icon: {
+                    Image(systemName: "photo.on.rectangle.angled")
+                }
+            }
+            if let gifURL = frameStore.gifURL, let image = frameStore.frames.first?.image {
+                ShareLink(item: gifURL, preview: SharePreview("madeyourself.gif", image: Image(uiImage: image)))
+            }
+            
             Divider()
             Button(role: .destructive) {
                 showDeleteAllAlert = true
@@ -261,7 +275,12 @@ struct ContentView: View {
         ZStack {
             Image(.canvasBackground)
                 .resizable()
-            frameStore.frames[frameStore.animationFrameIndex].image
+            if let uiImage = frameStore.frames[frameStore.animationFrameIndex].image {
+                Image(uiImage: uiImage)
+            } else {
+                canvas(for: frameStore.animationFrameIndex)
+            }
+            
         }
         .clipShape(RoundedRectangle(cornerRadius: 20))
     }
@@ -426,8 +445,8 @@ struct ContentView: View {
                             Image(.canvasBackground)
                                 .resizable()
                                 .frame(width: 56 * frameStore.canvasAspectRation, height: 56)
-                            if frameStore.frames[index].image != nil {
-                                frameStore.frames[index].image!
+                            if let image = frameStore.frames[index].image{
+                                Image(uiImage: image)
                                     .resizable()
                                     .frame(width: 56 * frameStore.canvasAspectRation, height: 56)
                             } else {
