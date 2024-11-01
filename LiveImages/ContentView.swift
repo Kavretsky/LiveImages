@@ -323,7 +323,7 @@ struct ContentView: View {
             Color.clear
                 .frame(height: 32)
         } else {
-            HStack(spacing: 16) {
+            HStack(spacing: 21) {
                 Image(.pencil)
                     .renderingMode(.template)
                     .foregroundStyle(instrument == .pen ? .accent : .white)
