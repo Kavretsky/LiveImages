@@ -11,11 +11,6 @@ struct LineWidthEditor: View {
     private let range: ClosedRange<CGFloat> = 1...30
     @Binding var lineWidth: CGFloat
     
-    init(lineWidth: Binding<CGFloat>) {
-        _lineWidth = lineWidth
-        _sliderOffset = .init(wrappedValue: (lineWidth.wrappedValue - range.lowerBound) / (range.upperBound - range.lowerBound) * (sliderWidth - circleRadius))
-    }
-    
     private let circleRadius: CGFloat = 32
     private let sliderWidth: CGFloat = 245
     
@@ -34,9 +29,6 @@ struct LineWidthEditor: View {
         }
     }
     
-    @State private var sliderOffsetChange:CGFloat = 0
-    @State private var sliderOffset: CGFloat
-    
     private var slider: some View {
         ZStack(alignment: .leading) {
             sliderBackground
@@ -44,12 +36,12 @@ struct LineWidthEditor: View {
                 .fill(.white)
                 .frame(width: circleRadius - 2, height: circleRadius - 2)
                 .shadow(radius: 4)
-                .offset(x: ((lineWidth - range.lowerBound) / (range.upperBound - range.lowerBound) * (sliderWidth - circleRadius)))
+                .offset(x: max(circleRadius / 2,min((lineWidth - range.lowerBound) / (range.upperBound - range.lowerBound) * (sliderWidth - circleRadius / 2), sliderWidth)) - circleRadius / 2)
                 .overlay(alignment: .center) {
                     RoundedRectangle(cornerRadius: lineWidth)
                         .fill(.accent)
                         .frame(width: lineWidth, height: lineWidth)
-                        .offset(x: ((lineWidth - range.lowerBound) / (range.upperBound - range.lowerBound) * (sliderWidth - circleRadius)))
+                        .offset(x: max(circleRadius / 2,min((lineWidth - range.lowerBound) / (range.upperBound - range.lowerBound) * (sliderWidth - circleRadius / 2), sliderWidth)) - circleRadius / 2)
                 }
             
             
@@ -58,12 +50,7 @@ struct LineWidthEditor: View {
         .gesture(
             DragGesture(minimumDistance: 0).simultaneously(with: LongPressGesture(minimumDuration: 0, maximumDistance: 0))
                 .onChanged({ dragValue in
-                    sliderOffsetChange = dragValue.first?.translation.width ?? 0
-                    lineWidth = max(range.lowerBound, min((sliderOffset + sliderOffsetChange) / (sliderWidth - circleRadius) * (range.upperBound - range.lowerBound + 1) , range.upperBound))
-                })
-                .onEnded({ value in
-                    sliderOffset = max(range.lowerBound, min(sliderOffset + sliderOffsetChange, sliderWidth - circleRadius))
-                    sliderOffsetChange = 0
+                    lineWidth = max(range.lowerBound, min((dragValue.first?.location.x ?? 0) / (sliderWidth - circleRadius) * (range.upperBound - range.lowerBound) , range.upperBound))
                 })
         )
     }

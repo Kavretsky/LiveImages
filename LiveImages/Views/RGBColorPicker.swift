@@ -15,66 +15,56 @@ struct RGBColorPicker: View {
     init(color: Binding<Color>, components: Color.Resolved) {
         _color = color
         self.components = components
-        _redSliderOffset = .init(wrappedValue: CGFloat(components.red) * (sliderWidth - circleRadius))
-        _greenSliderOffset = .init(wrappedValue: CGFloat(components.green) * (sliderWidth -  circleRadius))
-        _blueSliderOffset = .init(wrappedValue: CGFloat(components.blue) * (sliderWidth -  circleRadius))
+
     }
-    
-    @State private var redSliderOffset: CGFloat
-    @State private var redSliderOffsetChange: CGFloat = 0
-    
-    @State private var greenSliderOffset: CGFloat
-    @State private var greenSliderOffsetChange: CGFloat = 0
-    
-    @State private var blueSliderOffset: CGFloat
-    @State private var blueSliderOffsetChange: CGFloat = 0
     
     private let sliderWidth: CGFloat = 245
     private let circleRadius: CGFloat = 32
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
+        VStack(alignment: .leading, spacing: 24) {
             
-            HStack {
-                Text("Red".uppercased())
-                    .font(.headline)
-                    .foregroundStyle(.secondary)
-                Spacer()
-                Text("\(Int((components.red * 255).rounded(.toNearestOrEven)))")
-                    .font(.headline)
+            VStack(spacing: 13) {
+                HStack {
+                    Text("Red".uppercased())
+                        .font(.headline)
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                    Text("\(Int((components.red * 255).rounded(.toNearestOrEven)))")
+                        .font(.headline)
+                }
+                colorSlider(gradient: redGradient, colorComponent: components.red) { redColor in
+                    Color(red: redColor, green: Double(components.green), blue: Double(components.blue))
+                }
             }
-            colorSlider(gradient: redGradient, sliderOffset: $redSliderOffset, sliderOffsetChange: $redSliderOffsetChange, colorComponent: components.red) { redColor in
-                Color(red: redColor, green: Double(components.green), blue: Double(components.blue))
-            }
-            
-            HStack {
-                Text("Green".uppercased())
-                    .font(.headline)
-                    .foregroundStyle(.secondary)
-                Spacer()
-                Text("\(Int((components.green * 255).rounded(.toNearestOrEven)))")
-                    .font(.headline)
-            }
+            VStack(spacing: 13) {
+                HStack {
+                    Text("Green".uppercased())
+                        .font(.headline)
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                    Text("\(Int((components.green * 255).rounded(.toNearestOrEven)))")
+                        .font(.headline)
+                }
                 
-            colorSlider(gradient: greenGradient, sliderOffset: $greenSliderOffset, sliderOffsetChange: $greenSliderOffsetChange, colorComponent: components.green) { greenColor in
-                Color(red: Double(components.red), green: greenColor, blue: Double(components.blue))
+                colorSlider(gradient: greenGradient, colorComponent: components.green) { greenColor in
+                    Color(red: Double(components.red), green: greenColor, blue: Double(components.blue))
+                }
             }
-            
-            HStack {
-                Text("Blue".uppercased())
-                    .font(.headline)
-                    .foregroundStyle(.secondary)
-                Spacer()
-                Text("\(Int((components.blue * 255).rounded(.toNearestOrEven)))")
-                    .font(.headline)
-            }
-            colorSlider(gradient: blueGradient, sliderOffset: $blueSliderOffset, sliderOffsetChange: $blueSliderOffsetChange, colorComponent: components.blue) { blueColor in
-                Color(red: Double(components.red), green: Double(components.green), blue: blueColor)
+            VStack(spacing: 13) {
+                HStack {
+                    Text("Blue".uppercased())
+                        .font(.headline)
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                    Text("\(Int((components.blue * 255).rounded(.toNearestOrEven)))")
+                        .font(.headline)
+                }
+                colorSlider(gradient: blueGradient, colorComponent: components.blue) { blueColor in
+                    Color(red: Double(components.red), green: Double(components.green), blue: blueColor)
+                }
             }
         }
-        
-        
-        
     }
     
     private var redGradient: [Color] {
@@ -98,7 +88,7 @@ struct RGBColorPicker: View {
         ]
     }
     
-    func colorSlider(gradient: [Color], sliderOffset: Binding<CGFloat>, sliderOffsetChange: Binding<CGFloat>, colorComponent: Float, colorCreator: @escaping (CGFloat) -> Color) -> some View {
+    func colorSlider(gradient: [Color], colorComponent: Float, colorCreator: @escaping (CGFloat) -> Color) -> some View {
         
         ZStack(alignment: .leading) {
             RoundedRectangle(cornerRadius: circleRadius)
@@ -118,15 +108,9 @@ struct RGBColorPicker: View {
         .gesture(
             DragGesture(minimumDistance: 0).simultaneously(with: LongPressGesture(minimumDuration: 0, maximumDistance: 0))
                 .onChanged({ dragValue in
-                    sliderOffsetChange.wrappedValue = dragValue.first?.translation.width ?? 0
-                    color = colorCreator(max(0, min(sliderOffsetChange.wrappedValue + sliderOffset.wrappedValue, sliderWidth - circleRadius)) / (sliderWidth - circleRadius))
-                })
-                .onEnded({ value in
-                    sliderOffset.wrappedValue = max(0, min(sliderOffset.wrappedValue + sliderOffsetChange.wrappedValue, sliderWidth - circleRadius))
-                    sliderOffsetChange.wrappedValue = 0
+                    color = colorCreator(max(0, min((dragValue.first?.location.x ?? 0) - 16, sliderWidth - circleRadius)) / (sliderWidth - circleRadius))
                 })
         )
-        
         
     }
 }
