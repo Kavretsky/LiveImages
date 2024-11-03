@@ -172,12 +172,16 @@ struct ContentView: View {
                 
             }
             Button {
-                //TODO: generate
+                guard !frameStore.isGeneratingFrames else { return }
+                Task {
+                     await frameStore.generateFrames(count: 1000)
+                }
             } label: {
                 Label {
-                    Text("Generate")
+                    Text(!frameStore.isGeneratingFrames ? "Generate" : "Generating...")
                 } icon: {
                     Image(systemName: "timelapse")
+                        .symbolEffect(.pulse, options: .repeating, isActive: frameStore.isGeneratingFrames)
                 }
             }
             
@@ -207,10 +211,19 @@ struct ContentView: View {
             }
             
         } label: {
-            Image(systemName: "ellipsis")
-                .font(.title2)
-                .foregroundStyle(.white)
-                .frame(width: 32, height: 32)
+            if frameStore.isGeneratingFrames {
+                Image(systemName: "timelapse")
+                    .symbolEffect(.pulse.byLayer, options: .repeating, isActive: frameStore.isGeneratingFrames)
+                    .font(.title2)
+                    .foregroundStyle(.white)
+                    .frame(width: 32, height: 32)
+            } else {
+                Image(systemName: "ellipsis")
+                    .font(.title2)
+                    .foregroundStyle(.white)
+                    .frame(width: 32, height: 32)
+            }
+            
         }
     }
     

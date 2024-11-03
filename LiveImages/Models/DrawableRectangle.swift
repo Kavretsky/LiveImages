@@ -63,10 +63,12 @@ class DrawableRectangle: Drawable {
         context.restoreGState()
     }
     
-    init(origin: CGPoint, width: CGFloat = 80, height: CGFloat = 80, color: Color) {
+    init(origin: CGPoint, width: CGFloat, height: CGFloat, color: Color, scale: CGFloat, rotateAngle: Angle) {
         self.origin = origin
         self.width = width
         self.height = height
         self.color = color
+        self.scaleValue = scale
+        self.rotateAngle = rotateAngle
     }
 }

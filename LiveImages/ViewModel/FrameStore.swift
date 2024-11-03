@@ -10,7 +10,7 @@ import Observation
 import SwiftUI
 import UniformTypeIdentifiers
 
-@Observable
+@Observable @MainActor
 final class FrameStore {
     private(set) var frames: [DrawingFrame] = [.init(name: "Frame 1")]
     private let undoManager = MyUndoManager()
@@ -60,7 +60,7 @@ final class FrameStore {
             frames.append(.init(name: "Frame \(frames.count + 1)"))
         }
         renderImage(for: currentFrameIndex)
-        changeCurrentFrame(to: currentFrameIndex + 1)
+        changeCurrentFrame(to: frames.endIndex - 1)
     }
     
     func duplicateFrame() {
@@ -195,7 +195,9 @@ final class FrameStore {
         timer.invalidate()
         timer = Timer.scheduledTimer(withTimeInterval: 1.0 / Double(framePerSecond), repeats: true) { [weak self] _ in
             guard let self else { return }
-            animationFrameIndex = (animationFrameIndex + 1) % frames.count
+            DispatchQueue.main.async {
+                self.animationFrameIndex = (self.animationFrameIndex + 1) % self.frames.count
+            }
         }
     }
     
@@ -335,6 +337,7 @@ final class FrameStore {
         case noImageDestination
     }
     
+    
     private func gifGenerator() async throws -> URL {
         guard let directory = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first else {
             throw CreateGifError.noCacheDirectory
@@ -342,7 +345,6 @@ final class FrameStore {
         if let gifURL {
             try FileManager.default.removeItem(at: gifURL)
         }
-        
         let fileName = "madeyourself.gif"
         let fileURL = directory.appendingPathComponent(fileName)
         let loopProperty = [kCGImagePropertyGIFDictionary : [
@@ -387,11 +389,47 @@ final class FrameStore {
     
     
     //MARK: Frame Generation
-//    func generateFrames(_ count: Int) {
-//        for i in 0..<count {
-//            
-//        }
-//    }
+    private(set) var isGeneratingFrames: Bool = false
+    
+    func generateFrames(count: Int) async {
+        guard !isGeneratingFrames else { return }
+        guard canvasSize != nil else { return }
+        isGeneratingFrames = true
+        await withTaskGroup(of: DrawingFrame.self) { [weak self] group in
+            for _ in 0..<count {
+                guard let self else { return }
+                group.addTask {
+                    return await self.generateFrame()
+                }
+                
+                for await frame in group {
+                    frames.append(frame)
+                    updateImage(for: frames.count - 1)
+                }
+            }
+        }
+        
+        isGeneratingFrames = false
+    }
+    
+    private func generateFrame() async -> DrawingFrame {
+        let frame: DrawingFrame = .init(name: "generatedFrame")
+        guard let path = frame.pathHead else { return frame }
+        for _ in 0..<Int.random(in: 1...10) {
+            let shape = DrawableShape.allCases.randomElement() ?? .circle
+            let color = Color.randomColor()
+            let origin = CGPoint(x: .random(in: 0..<Int(canvasSize!.width) - 50) , y: .random(in: 0..<Int(canvasSize!.height) - 50))
+            let scale: CGFloat = .random(in: 0.1..<5)
+            let height: CGFloat = .random(in: 50..<canvasSize!.height / scale)
+            let width: CGFloat = .random(in: 50..<canvasSize!.width / scale)
+            let rotation: Angle = Angle(degrees: .random(in: 0..<360))
+            if let shape = createShape(shape, color: color, origin: origin, scaleValue: scale, rotateAngle: rotation, width: width, height: height) {
+                path.shapes.append(shape)
+            }
+        }
+        
+        return frame
+    }
     
     
     //MARK: Shapes
@@ -435,16 +473,19 @@ final class FrameStore {
         }
     }
     
-    private func createShape(_ shape: DrawableShape, color: Color) -> (any Drawable)? {
+    private func createShape(_ shape: DrawableShape, color: Color, origin: CGPoint = .zero, scaleValue: CGFloat = 1, rotateAngle: Angle = .zero, width: CGFloat = 80, height: CGFloat = 80) -> (any Drawable)? {
         guard let canvasSize else { return nil }
-        
+        var origin = origin
+        if origin == .zero {
+            origin = CGPoint(x: canvasSize.width / 2 - width / 2, y: canvasSize.height / 2 - height / 2)
+        }
         switch shape {
         case .circle:
-            return DrawableCircle(scaleValue: 1, rotateAngle: .zero, origin: CGPoint(x: canvasSize.width / 2 - 40, y: canvasSize.height / 2 - 40), color: color, width: 80, height: 80)
+            return DrawableCircle(scaleValue: scaleValue, rotateAngle: rotateAngle, origin: origin, color: color, width: width, height: height)
         case .rectangle:
-            return DrawableRectangle(origin: CGPoint(x: canvasSize.width / 2 - 40, y: canvasSize.height / 2 - 40), color: color)
+            return DrawableRectangle(origin: origin, width: width, height: height, color: color, scale: scaleValue, rotateAngle: rotateAngle)
         case .triangle:
-            return DrawableTriangle(origin: CGPoint(x: canvasSize.width / 2 - 40, y: canvasSize.height / 2 - 40), color: color)
+            return DrawableTriangle(origin: origin, width: width, height: height, color: color, scale: scaleValue, rotateAngle: rotateAngle)
         }
         
     }

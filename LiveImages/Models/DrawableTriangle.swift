@@ -71,11 +71,13 @@ class DrawableTriangle: Drawable {
         context.restoreGState()
     }
     
-    init(origin: CGPoint, color: Color, width: CGFloat = 80, height: CGFloat = 80) {
+    init(origin: CGPoint, width: CGFloat, height: CGFloat, color: Color, scale: CGFloat, rotateAngle: Angle) {
         self.origin = origin
-        self.color = color
         self.width = width
         self.height = height
+        self.color = color
+        self.scaleValue = scale
+        self.rotateAngle = rotateAngle
     }
     
     
