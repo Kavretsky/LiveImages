@@ -11,14 +11,14 @@ import Observation
 class PathNode: Equatable {
     var erasePath: DrawingPath?
     var next: PathNode? = nil
-    var prev: PathNode? = nil
     var drawingPaths: [DrawingPath] = []
+    var shapes: [any Drawable] = []
     
-    init(erasePath: DrawingPath? = nil, next: PathNode? = nil, prev: PathNode? = nil, drawingPaths: [DrawingPath] = []) {
+    init(erasePath: DrawingPath? = nil, next: PathNode? = nil, prev: PathNode? = nil, drawingPaths: [DrawingPath] = [], shapes: [any Drawable] = []) {
         self.erasePath = erasePath
         self.next = next
-        self.prev = prev
         self.drawingPaths = drawingPaths
+        self.shapes = shapes
     }
     
     static func == (lhs: PathNode, rhs: PathNode) -> Bool {

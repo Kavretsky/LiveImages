@@ -92,7 +92,7 @@ final class FrameStore {
     //MARK: Path intents
     private func addPath(_ path: DrawingPath, to frameIndex: Int) {
         guard frameIndex < frames.count, frameIndex >= 0 else { return }
-        guard frames[frameIndex].pathHead != nil else {
+        guard let pathHead = frames[frameIndex].pathHead else {
             let nextPath = PathNode(erasePath: path.type == .erase ? path : nil, drawingPaths: path.type == .erase ? [] : [path])
             frames[frameIndex].appendPath(nextPath)
             return
@@ -100,14 +100,14 @@ final class FrameStore {
         
         switch path.type {
         case .erase:
-            if frames[frameIndex].pathHead?.erasePath == nil {
-                frames[frameIndex].pathHead?.erasePath = path
+            if pathHead.erasePath == nil && pathHead.shapes.isEmpty {
+                pathHead.erasePath = path
             } else {
                 let nextPath = PathNode(erasePath: path)
                 frames[frameIndex].appendPath(nextPath)
             }
         case .fill:
-            if frames[frameIndex].pathHead?.erasePath == nil {
+            if pathHead.erasePath == nil && pathHead.shapes.isEmpty {
                 frames[frameIndex].pathHead?.drawingPaths.append(path)
             } else {
                 let nextPath = PathNode(drawingPaths: [path])
@@ -127,8 +127,8 @@ final class FrameStore {
         if frames[frameIndex].pathHead?.drawingPaths.last == path {
             frames[frameIndex].pathHead?.drawingPaths.removeLast()
         }
-        if frames[frameIndex].pathHead?.drawingPaths.count == 0 && frames[frameIndex].pathHead?.erasePath == nil {
-            frames[frameIndex].removeFirst()
+        if frames[frameIndex].pathHead?.drawingPaths.count == 0 && frames[frameIndex].pathHead?.erasePath == nil && frames[frameIndex].pathHead?.shapes.count == 0 {
+            frames[frameIndex].removeFirstNode()
         }
     }
     
@@ -149,7 +149,7 @@ final class FrameStore {
     private func removePathWithUndo(_ path: DrawingPath) {
         removePath(path, from: currentFrameIndex)
         frames[currentFrameIndex].didChanged = true
-        undoManager.registerRedu(frameID: frames[currentFrameIndex].id) { [weak self] in
+        undoManager.registerRedo(frameID: frames[currentFrameIndex].id) { [weak self] in
             self?.addPathWithUndo(path)
         }
     }
@@ -248,11 +248,17 @@ final class FrameStore {
             context.clip(to: CGRect(origin: .zero, size: canvasSize!), mask: image.cgImage!)
         }
         context.saveGState()
+        
         if let next = drawingPath.next {
             var newContext = context
             drawPath(next, in: &newContext)
         }
         context.restoreGState()
+        if !drawingPath.shapes.isEmpty {
+            for shape in drawingPath.shapes {
+                shape.draw(using: &context)
+            }
+        }
         for path in drawingPath.drawingPaths {
             drawPath(path, in: &context)
         }
@@ -379,4 +385,103 @@ final class FrameStore {
         }
     }
     
+    
+    //MARK: Frame Generation
+//    func generateFrames(_ count: Int) {
+//        for i in 0..<count {
+//            
+//        }
+//    }
+    
+    
+    //MARK: Shapes
+    private func addShape<T: Drawable>(_ shape: T) {
+        if let path = frames[currentFrameIndex].pathHead, path.erasePath == nil, path.drawingPaths.isEmpty {
+            path.shapes.append(shape)
+        } else {
+            frames[currentFrameIndex].appendPath(.init(shapes: [shape]))
+        }
+    }
+    
+    private func removeShape<T: Drawable>(_ shape: T) {
+        guard let path = frames[currentFrameIndex].pathHead else { return }
+        if shape.id == path.shapes.last?.id {
+            path.shapes.removeLast()
+            if path.shapes.isEmpty {
+                frames[currentFrameIndex].removeFirstNode()
+            }
+        }
+    }
+    
+    func undoablyAddShape(_ shape: DrawableShape, color: Color) {
+        guard let newShape = createShape(shape, color: color) else { return }
+        addShape(newShape)
+        undoManager.registerUndo(frameID: frames[currentFrameIndex].id, removePrevious: true) { [weak self] in
+            self?.undoablyRemoveShape(newShape)
+        }
+    }
+    
+    private func undoablyAddShape<T: Drawable>(_ shape: T) {
+        addShape(shape)
+        undoManager.registerUndo(frameID: frames[currentFrameIndex].id) { [weak self] in
+            self?.undoablyRemoveShape(shape)
+        }
+    }
+    
+    private func undoablyRemoveShape<T: Drawable>(_ shape: T) {
+        removeShape(shape)
+        undoManager.registerRedo(frameID: frames[currentFrameIndex].id) { [weak self] in
+            self?.undoablyAddShape(shape)
+        }
+    }
+    
+    private func createShape(_ shape: DrawableShape, color: Color) -> (any Drawable)? {
+        guard let canvasSize else { return nil }
+        
+        switch shape {
+        case .circle:
+            return DrawableCircle(scaleValue: 1, rotateAngle: .zero, origin: CGPoint(x: canvasSize.width / 2 - 40, y: canvasSize.height / 2 - 40), color: color, width: 80, height: 80)
+        case .rectangle:
+            return DrawableRectangle(origin: CGPoint(x: canvasSize.width / 2 - 40, y: canvasSize.height / 2 - 40), color: color)
+        case .triangle:
+            return DrawableTriangle(origin: CGPoint(x: canvasSize.width / 2 - 40, y: canvasSize.height / 2 - 40), color: color)
+        }
+        
+    }
+    
+    func moveShapeWithUndo<T: Drawable>(_ shape: T, to point: CGPoint, removeRedo: Bool = false) {
+        let prevCenter = CGPoint(x: shape.origin.x + shape.width / 2, y: shape.origin.y + shape.height / 2)
+        shape.move(to: point)
+        undoManager.registerUndo(frameID: frames[currentFrameIndex].id, removePrevious: removeRedo) { [weak self] in
+            self?.moveShapeBackWithRedo(shape, to: prevCenter)
+        }
+    }
+    
+    private func moveShapeBackWithRedo<T: Drawable>(_ shape: T, to point: CGPoint) {
+        let prevCenter = CGPoint(x: shape.origin.x + shape.width / 2, y: shape.origin.y + shape.height / 2)
+        shape.move(to: point)
+        undoManager.registerRedo(frameID: frames[currentFrameIndex].id) { [weak self] in
+            self?.moveShapeWithUndo(shape, to: prevCenter)
+        }
+    }
+    
+    func scaleAndRotateShapeWithUndo<T: Drawable>(_ shape: T, scale: CGFloat, angle: Angle, removeRedo: Bool = false) {
+        let prevScale = shape.scaleValue
+        let prevAngle = shape.rotateAngle
+        shape.scaleValue *= scale
+        shape.rotateAngle += angle
+        undoManager.registerUndo(frameID: frames[currentFrameIndex].id, removePrevious: removeRedo) { [weak self] in
+            self?.scaleAndRotateShapeWithRedo(shape, scale: prevScale / shape.scaleValue, angle: prevAngle - shape.rotateAngle)
+        }
+    }
+    
+    private func scaleAndRotateShapeWithRedo<T: Drawable>(_ shape: T, scale: CGFloat, angle: Angle) {
+        let prevScale = shape.scaleValue
+        let prevAngle = shape.rotateAngle
+        shape.scaleValue *= scale
+        shape.rotateAngle += angle
+        undoManager.registerRedo(frameID: frames[currentFrameIndex].id) { [weak self] in
+            self?.scaleAndRotateShapeWithUndo(shape, scale: prevScale / shape.scaleValue, angle: prevAngle - shape.rotateAngle)
+        }
+    }
 }

@@ -18,7 +18,7 @@ final class MyUndoManager {
             redoStackHash[frameID] = []
         }
     }
-    func registerRedu(frameID: String, _ closure: @escaping () -> Void) {
+    func registerRedo(frameID: String, _ closure: @escaping () -> Void) {
         redoStackHash[frameID, default: []].append(closure)
     }
     

@@ -7,6 +7,7 @@
 
 import Foundation
 import SwiftUI
+import Observation
 
 struct DrawingFrame: Identifiable, Equatable {
     let id = UUID().uuidString
@@ -19,6 +20,7 @@ struct DrawingFrame: Identifiable, Equatable {
     
     init(name: String) {
         self.name = name
+        dummy.next = .init()
         
     }
     private var dummy = PathNode()
@@ -29,8 +31,12 @@ struct DrawingFrame: Identifiable, Equatable {
         didChanged = true
     }
     
-    mutating func removeFirst() {
-        dummy.next = dummy.next?.next
+    mutating func removeFirstNode() {
+        if dummy.next?.next == nil {
+            dummy.next = .init()
+        } else {
+            dummy.next = dummy.next?.next
+        }
         didChanged = true
     }
     

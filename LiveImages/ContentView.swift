@@ -12,10 +12,26 @@ enum Instument: String {
     case eraser = "Eraser"
     case brush = "Brush"
     case color = "Color"
-    case instruments = "Instruments"
+    case shapes = "Shapes"
     case linewidth = "Width"
     case none
 }
+
+enum DrawableShape: CaseIterable {
+    case rectangle
+    case circle
+    case triangle
+    
+    var image: Image {
+        switch self {
+        case .circle: Image(.circle)
+        case .rectangle: Image(.square)
+        case .triangle: Image(.triangle)
+        }
+    }
+}
+
+
 
 struct ContentView: View {
     var frameStore: FrameStore = .init()
@@ -24,6 +40,7 @@ struct ContentView: View {
     @State private var selectedColor: Color = .liveImagesBlue
     @State private var currentPath: [CGPoint] = []
     @State private var image: Image?
+    @State private var selectedShape: DrawableShape?
     
     var body: some View {
             ZStack {
@@ -60,6 +77,10 @@ struct ContentView: View {
                                         .overlayBase()
                                         .padding(.bottom, 48)
                                 }
+                                if instrument == .shapes {
+                                    ShapePicker(selectedShape: $selectedShape)
+                                        .padding(.bottom, 48)
+                                }
                             }
                         
                     }
@@ -70,6 +91,15 @@ struct ContentView: View {
                 Button("Delete All", role: .destructive) {
                     frameStore.removeAllFrames()
                 }
+            }
+            .onChange(of: selectedShape) {
+                if let selectedShape {
+                    frameStore.undoablyAddShape(selectedShape, color: selectedColor)
+                    instrument = .none
+                }
+            }
+            .onChange(of: instrument) { oldValue, newValue in
+                selectedShape = nil
             }
     }
     
@@ -233,6 +263,7 @@ struct ContentView: View {
             if frameStore.canvasSize == nil {
                 frameStore.canvasSize = size
             }
+            
             let savedContext = context
             if instrument == .eraser && frameIndex == frameStore.currentFrameIndex {
                 if currentPath.count != 1 {
@@ -240,6 +271,7 @@ struct ContentView: View {
                     currentDrawingPath.addLines(currentPath)
                     context.clipToLayer(options: .inverse) { layerContext in
                         layerContext.stroke(currentDrawingPath, with: .color(selectedColor), style: strokeStyle(with: lineWidth))
+                        
                     }
                 } else {
                     let path = Path(ellipseIn: CGRect(x: currentPath[0].x - lineWidth / 2, y: currentPath[0].y - lineWidth / 2, width: lineWidth, height: lineWidth))
@@ -277,9 +309,10 @@ struct ContentView: View {
             if let uiImage = frameStore.frames[frameStore.animationFrameIndex].image {
                 Image(uiImage: uiImage)
             } else {
-                Image(.canvasBackground)
-                    .resizable()
-                canvas(for: frameStore.animationFrameIndex)
+                ProgressView()
+                    .onAppear {
+                        frameStore.updateImage(for: frameStore.animationFrameIndex)
+                    }
             }
             
         }
@@ -296,8 +329,13 @@ struct ContentView: View {
             }
             canvas(for: frameStore.currentFrameIndex)
                 .gesture(
-                    drawingGesture, isEnabled: instrument == .pen || instrument == .eraser
+                    drawingGesture
                 )
+                .gesture(
+                    zoomAndRotateGesture
+                    , isEnabled: !(frameStore.frames[frameStore.currentFrameIndex].pathHead?.shapes.isEmpty ?? true)
+                )
+               
         }
         .clipShape(RoundedRectangle(cornerRadius: 20))
     }
@@ -310,9 +348,13 @@ struct ContentView: View {
                 clippedContext.stroke(path, with: .color(toErase.color), style: strokeStyle(with: toErase.lineWidth))
             }
         }
+        
         if let next = drawingPath.next {
             var newContext = context
             drawPath(next, in: &newContext)
+        }
+        for shape in drawingPath.shapes {
+            shape.draw(using: &context, isSelected: shape.id == frameStore.frames[frameStore.currentFrameIndex].pathHead?.shapes.last?.id && instrument == .none)
         }
         for path in drawingPath.drawingPaths {
             drawPath(path, in: &context)
@@ -335,13 +377,44 @@ struct ContentView: View {
     private var drawingGesture: some Gesture {
         LongPressGesture(minimumDuration: 0, maximumDistance: 10).simultaneously(with: DragGesture(minimumDistance: 0))
             .onChanged({ value in
-                currentPath.append(value.second?.location ?? .zero)
+                if instrument == .none, let shape = frameStore.frames[frameStore.currentFrameIndex].pathHead?.shapes.last {
+                    shape.draggingOrigin = value.second?.location ?? .zero
+                    return
+                }
+                if instrument == .pen || instrument == .eraser {
+                    currentPath.append(value.second?.location ?? .zero)
+                }
+                if instrument == .color {
+                    instrument = .pen
+                }
             })
             .onEnded{ value in
-                let newPath = DrawingPath(points: currentPath, color: selectedColor, lineWidth: lineWidth, type: instrument == .eraser ? .erase : .fill)
-                frameStore.addPathWithUndo(newPath, clearRedo: true)
-                currentPath = []
+                if  instrument == .pen || instrument == .eraser {
+                    let newPath = DrawingPath(points: currentPath, color: selectedColor, lineWidth: lineWidth, type: instrument == .eraser ? .erase : .fill)
+                    frameStore.addPathWithUndo(newPath, clearRedo: true)
+                    currentPath = []
+                }
+                if instrument == .none, let shape = frameStore.frames[frameStore.currentFrameIndex].pathHead?.shapes.last{
+                    frameStore.moveShapeWithUndo(shape, to: value.second?.location ?? .zero)
+                }
             }
+    }
+    
+    private var zoomAndRotateGesture: some Gesture {
+        MagnifyGesture().simultaneously(with: RotateGesture())
+            .onChanged({ value in
+                if let shape = frameStore.frames[frameStore.currentFrameIndex].pathHead?.shapes.last{
+                    shape.scaleChange = value.first?.magnification ?? 1
+                    shape.rotationChange = value.second?.rotation ?? .zero
+                }
+            })
+            .onEnded({ value in
+                if let shape = frameStore.frames[frameStore.currentFrameIndex].pathHead?.shapes.last{
+                    shape.scaleChange = 1
+                    shape.rotationChange = .zero
+                    frameStore.scaleAndRotateShapeWithUndo(shape, scale: value.first?.magnification ?? 1, angle: value.second?.rotation ?? .zero, removeRedo: true)
+                }
+            })
     }
     
     private var fontWeight: Font.Weight {
@@ -361,20 +434,16 @@ struct ContentView: View {
                 .frame(height: 32)
         } else {
             HStack(spacing: 16) {
-//                Button {
-//                    instrument = instrument == .linewidth ? .none : .linewidth
-//                } label: {
-                    Image(systemName: "scribble.variable")
-                        .font(.system(size: 20))
-                        .foregroundStyle(instrument == .linewidth ? .accent : .white)
-                        .fontWeight(
-                            fontWeight
-                        )
-                        .frame(width: 32, height: 32)
-                        .onTapGesture {
-                            instrument = instrument == .linewidth ? .none : .linewidth
-                        }
-//                }
+                Image(systemName: "scribble.variable")
+                    .font(.system(size: 20))
+                    .foregroundStyle(instrument == .linewidth ? .accent : .white)
+                    .fontWeight(
+                        fontWeight
+                    )
+                    .frame(width: 32, height: 32)
+                    .onTapGesture {
+                        instrument = instrument == .linewidth ? .none : .linewidth
+                    }
                 Image(.pencil)
                     .renderingMode(.template)
                     .foregroundStyle(instrument == .pen ? .accent : .white)
@@ -401,11 +470,11 @@ struct ContentView: View {
                 }
                 
                 Button {
-                    instrument = instrument == .instruments ? .none : .instruments
+                    instrument = instrument == .shapes ? .none : .shapes
                 } label: {
                     Image(.instruments)
                         .renderingMode(.template)
-                        .foregroundStyle(instrument == .instruments ? .accent : .white)
+                        .foregroundStyle(instrument == .shapes ? .accent : .white)
                         .frame(width: 32, height: 32)
                 }
                 
