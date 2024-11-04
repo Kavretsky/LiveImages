@@ -112,6 +112,9 @@ struct ContentView: View {
             .onChange(of: instrument) { oldValue, newValue in
                 selectedShape = nil
             }
+            .onReceive(NotificationCenter.default.publisher(for: UIApplication.didReceiveMemoryWarningNotification)) { [weak frameStore] _ in
+                frameStore?.receiveMemoryWarningNotification()
+            }
     }
     
     private var headerView: some View {
@@ -136,18 +139,17 @@ struct ContentView: View {
                 Image(.leftActive)
                     .renderingMode(.template)
                     .tint(.buttonTint)
-                    .opacity(frameStore.frames.count > 1 ? 1 : 0.5)
             }
-            .disabled(frameStore.canUndo)
+            
+            .disabled(!frameStore.canUndo)
             Button {
                 frameStore.redo()
             } label: {
                 Image(.rightActive)
                     .renderingMode(.template)
                     .tint(.buttonTint)
-                    .opacity(frameStore.frames.count > 1 ? 1 : 0.5)
             }
-            .disabled(frameStore.canRedo)
+            .disabled(!frameStore.canRedo)
         }
     }
     
@@ -216,7 +218,7 @@ struct ContentView: View {
                 }
             } label: {
                 Label {
-                    Text("Create GIF")
+                    Text(frameStore.isCreatingGIF ? "Creating GIF..." : "Create GIF")
                 } icon: {
                     Image(systemName: "photo.on.rectangle.angled")
                 }
@@ -242,6 +244,12 @@ struct ContentView: View {
             if frameStore.isGeneratingFrames {
                 Image(systemName: "timelapse")
                     .symbolEffect(.pulse.byLayer, options: .repeating, isActive: frameStore.isGeneratingFrames)
+                    .font(.title2)
+                    .foregroundStyle(.buttonTint)
+                    .frame(width: 32, height: 32)
+            } else if frameStore.isCreatingGIF {
+                Image(systemName: "photo.on.rectangle.angled")
+                    .symbolEffect(.pulse.byLayer, options: .repeating, isActive: frameStore.isCreatingGIF)
                     .font(.title2)
                     .foregroundStyle(.buttonTint)
                     .frame(width: 32, height: 32)
@@ -372,6 +380,7 @@ struct ContentView: View {
             
             if let uiImage = frameStore.frames[frameStore.animationFrameIndex].image {
                 Image(uiImage: uiImage)
+                    .resizable()
             } else {
                 ProgressView()
                     .onAppear {
@@ -396,7 +405,8 @@ struct ContentView: View {
                     drawingGesture.simultaneously(with:zoomAndRotateGesture)
                 )
         }
-        .clipShape(RoundedRectangle(cornerRadius: 20))
+        .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .drawingGroup()
     }
     
     private func drawPath(_ drawingPath: PathNode, in context: inout GraphicsContext) {
@@ -493,23 +503,26 @@ struct ContentView: View {
                 .frame(height: 32)
         } else {
             HStack(spacing: 16) {
-                Image(systemName: "scribble.variable")
-                    .font(.system(size: 20))
-                    .foregroundStyle(instrument == .linewidth ? .accent : .buttonTint)
-                    .fontWeight(
-                        fontWeight
-                    )
-                    .frame(width: 32, height: 32)
-                    .onTapGesture {
-                        instrument = instrument == .linewidth ? .none : .linewidth
-                    }
-                Image(.pencil)
-                    .renderingMode(.template)
-                    .foregroundStyle(instrument == .pen ? .accent : .buttonTint)
-                    .onTapGesture {
-                        instrument = instrument == .pen ? .none : .pen
-                    }
-                    .frame(width: 32, height: 32)
+                Button {
+                    instrument = instrument == .linewidth ? .none : .linewidth
+                } label: {
+                    Image(systemName: "scribble.variable")
+                        .font(.system(size: 20))
+                        .foregroundStyle(instrument == .linewidth ? .accent : .buttonTint)
+                        .fontWeight(
+                            fontWeight
+                        )
+                        .frame(width: 32, height: 32)
+                }
+                Button {
+                    instrument = instrument == .pen ? .none : .pen
+                } label: {
+                    Image(.pencil)
+                        .renderingMode(.template)
+                        .foregroundStyle(instrument == .pen ? .accent : .buttonTint)
+                        .frame(width: 32, height: 32)
+                }
+                
                 Button {
                     instrument = instrument == .brush ? .none : .brush
                 } label: {
