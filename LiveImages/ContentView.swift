@@ -59,8 +59,10 @@ struct ContentView: View {
                         }
                         if frameStore.isPlaying {
                             animatableArea
+                                
                         } else {
                             drawingArea
+                                
                         }
                         Spacer(minLength: 24)
                         instrumentsView
@@ -87,10 +89,16 @@ struct ContentView: View {
                     .padding(16)
                 }
             }
+            .ignoresSafeArea(.keyboard)
             .alert("Are you sure to delete all frames?", isPresented: $showDeleteAllAlert) {
                 Button("Delete All", role: .destructive) {
                     frameStore.removeAllFrames()
                 }
+            }
+            .alert("Frame count", isPresented: $showGenerateFramesAlert) {
+                generateFramesAlert
+            } message: {
+                Text("Enter frame count to generate")
             }
             .onChange(of: selectedShape) {
                 if let selectedShape {
@@ -173,9 +181,8 @@ struct ContentView: View {
             }
             Button {
                 guard !frameStore.isGeneratingFrames else { return }
-                Task {
-                     await frameStore.generateFrames(count: 1000)
-                }
+                showGenerateFramesAlert = true
+                frameCountTFFocus = true
             } label: {
                 Label {
                     Text(!frameStore.isGeneratingFrames ? "Generate" : "Generating...")
@@ -184,9 +191,12 @@ struct ContentView: View {
                         .symbolEffect(.pulse, options: .repeating, isActive: frameStore.isGeneratingFrames)
                 }
             }
+            .disabled(frameStore.isGeneratingFrames)
             
             Button {
-                frameStore.createGIF()
+                Task {
+                    await frameStore.createGIF()
+                }
             } label: {
                 Label {
                     Text("Create GIF")
@@ -224,6 +234,23 @@ struct ContentView: View {
                     .frame(width: 32, height: 32)
             }
             
+        }
+    }
+    
+    @State private var frameCount:String = "10"
+    @State private var showGenerateFramesAlert = false
+    @FocusState private var frameCountTFFocus: Bool
+    private var generateFramesAlert: some View {
+        VStack{
+            TextField("Enter frame count", text: $frameCount)
+                .focused($frameCountTFFocus)
+                .keyboardType(.numberPad)
+            Button("Generate") {
+                Task {
+                    await frameStore.generateFrames(count: Int(frameCount) ?? 10)
+                }
+            }
+            Button("Cancel", role: .cancel) {}
         }
     }
     
@@ -342,13 +369,8 @@ struct ContentView: View {
             }
             canvas(for: frameStore.currentFrameIndex)
                 .gesture(
-                    drawingGesture
+                    drawingGesture.simultaneously(with:zoomAndRotateGesture)
                 )
-                .gesture(
-                    zoomAndRotateGesture
-                    , isEnabled: !(frameStore.frames[frameStore.currentFrameIndex].pathHead?.shapes.isEmpty ?? true)
-                )
-               
         }
         .clipShape(RoundedRectangle(cornerRadius: 20))
     }
@@ -388,14 +410,14 @@ struct ContentView: View {
     }
     
     private var drawingGesture: some Gesture {
-        LongPressGesture(minimumDuration: 0, maximumDistance: 10).simultaneously(with: DragGesture(minimumDistance: 0))
+         DragGesture(minimumDistance: 0)
             .onChanged({ value in
                 if instrument == .none, let shape = frameStore.frames[frameStore.currentFrameIndex].pathHead?.shapes.last {
-                    shape.draggingOrigin = value.second?.location ?? .zero
+                    shape.draggingOrigin = value.location
                     return
                 }
                 if instrument == .pen || instrument == .eraser {
-                    currentPath.append(value.second?.location ?? .zero)
+                    currentPath.append(value.location)
                 }
                 if instrument == .color {
                     instrument = .pen
@@ -408,7 +430,7 @@ struct ContentView: View {
                     currentPath = []
                 }
                 if instrument == .none, let shape = frameStore.frames[frameStore.currentFrameIndex].pathHead?.shapes.last{
-                    frameStore.moveShapeWithUndo(shape, to: value.second?.location ?? .zero)
+                    frameStore.moveShapeWithUndo(shape, to: value.location)
                 }
             }
     }

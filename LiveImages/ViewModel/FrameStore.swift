@@ -10,7 +10,7 @@ import Observation
 import SwiftUI
 import UniformTypeIdentifiers
 
-@Observable @MainActor
+@Observable
 final class FrameStore {
     private(set) var frames: [DrawingFrame] = [.init(name: "Frame 1")]
     private let undoManager = MyUndoManager()
@@ -213,29 +213,28 @@ final class FrameStore {
         guard index >= 0, index < frames.count else { return }
         guard frames[index].image == nil || frames[index].didChanged else { return }
         frames[index].image = nil
-        Task { [weak self] in
-            guard let self, let canvasSize else { return }
-            let renderer = UIGraphicsImageRenderer(size: canvasSize)
-            let image = renderer.image { ctx in
-                var context = ctx.cgContext
-                context.setLineCap(.round)
-                context.saveGState()
-                context.translateBy(x: 0, y: canvasSize.height)
-                context.scaleBy(x: 1, y: -1)
-                
-                if let image = UIImage(resource: .canvasBackground).cgImage {
-                    context.draw(image, in: .init(origin: .zero, size: canvasSize), byTiling: false)
-                }
-                context.restoreGState()
-                if let head = self.frames[index].pathHead {
-                    self.drawPath(head, in: &context)
-                }
+        if let pathNode = frames[index].pathHead, canvasSize != nil {
+            Task {
+                frames[index].image = await createImage(for: pathNode, size: canvasSize!)
             }
-            frames[index].image = image
-            
-            frames[index].didChanged = false
         }
-        
+    }
+    
+    private func createImage(for node: PathNode, size: CGSize) async -> UIImage {
+        let renderer = UIGraphicsImageRenderer(size: size)
+        return renderer.image { ctx in
+            var context = ctx.cgContext
+            context.setLineCap(.round)
+            context.saveGState()
+            context.translateBy(x: 0, y: size.height)
+            context.scaleBy(x: 1, y: -1)
+            
+            if let image = UIImage(resource: .canvasBackground).cgImage {
+                context.draw(image, in: .init(origin: .zero, size: size), byTiling: false)
+            }
+            context.restoreGState()
+            self.drawPath(node, in: &context)
+        }
     }
     
     private func drawPath(_ drawingPath: PathNode, in context: inout CGContext) {
@@ -353,7 +352,10 @@ final class FrameStore {
             throw CreateGifError.noImageDestination
         }
         
+        let globalColorMap = [kCGImagePropertyGIFDictionary: [kCGImagePropertyGIFHasGlobalColorMap : "No" as CFString]] as CFDictionary
+        
         CGImageDestinationSetProperties(destination, loopProperty)
+        CGImageDestinationSetProperties(destination, globalColorMap)
         let frameProperties = [
             kCGImagePropertyGIFDictionary : [
                 kCGImagePropertyGIFDelayTime : 1.0 / framePerSecond
@@ -361,13 +363,12 @@ final class FrameStore {
         ] as CFDictionary
         
         var index = 0
+        
         while index < frames.count  {
             try Task.checkCancellation()
-            guard let image = frames[index].image?.cgImage else {
-                index += 1
-                continue
+            if let image = frames[index].image?.cgImage {
+                CGImageDestinationAddImage(destination, image, frameProperties)
             }
-            CGImageDestinationAddImage(destination, image, frameProperties)
             index += 1
         }
         
@@ -376,15 +377,17 @@ final class FrameStore {
         return fileURL
     }
     
-    func createGIF() {
+    func createGIF() async {
         if createGifTask != nil {
             createGifTask?.cancel()
         }
         renderImage(for: currentFrameIndex)
-        createGifTask = Task(priority: .userInitiated) {
-            async let url = gifGenerator()
-            gifURL = try await url
+        do {
+            gifURL = try await gifGenerator()
+        } catch let error {
+            print(error.localizedDescription)
         }
+        
     }
     
     
@@ -393,8 +396,9 @@ final class FrameStore {
     
     func generateFrames(count: Int) async {
         guard !isGeneratingFrames else { return }
-        guard canvasSize != nil else { return }
+        guard let canvasSize else { return }
         isGeneratingFrames = true
+        var newFrames: [DrawingFrame] = []
         await withTaskGroup(of: DrawingFrame.self) { [weak self] group in
             for _ in 0..<count {
                 guard let self else { return }
@@ -403,17 +407,30 @@ final class FrameStore {
                 }
                 
                 for await frame in group {
-                    frames.append(frame)
-                    updateImage(for: frames.count - 1)
+                    newFrames.append(frame)
                 }
             }
         }
+        
+        await withTaskGroup(of: UIImage.self) { [weak self] group in
+            for index in 0..<newFrames.count {
+                guard let self else { return }
+                group.addTask {
+                    return await self.createImage(for: newFrames[index].pathHead!, size: canvasSize)
+                }
+                
+                for await image in group {
+                    newFrames[index].image = image
+                }
+            }
+        }
+        frames.append(contentsOf: newFrames)
         
         isGeneratingFrames = false
     }
     
     private func generateFrame() async -> DrawingFrame {
-        let frame: DrawingFrame = .init(name: "generatedFrame")
+        var frame: DrawingFrame = .init(name: "generatedFrame")
         guard let path = frame.pathHead else { return frame }
         for _ in 0..<Int.random(in: 1...10) {
             let shape = DrawableShape.allCases.randomElement() ?? .circle
@@ -425,6 +442,7 @@ final class FrameStore {
             let rotation: Angle = Angle(degrees: .random(in: 0..<360))
             if let shape = createShape(shape, color: color, origin: origin, scaleValue: scale, rotateAngle: rotation, width: width, height: height) {
                 path.shapes.append(shape)
+                frame.appendPath(.init())
             }
         }
         
