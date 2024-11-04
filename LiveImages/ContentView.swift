@@ -531,7 +531,6 @@ struct ContentView: View {
         }
     }
     
-    
     private var frameLineView: some View {
         HStack(spacing: 0) {
             Button {
@@ -547,7 +546,6 @@ struct ContentView: View {
                 LazyHStack(spacing: 3) {
                     ForEach(0..<frameStore.frames.count, id: \.self) { index in
                         ZStack {
-                            
                             if let image = frameStore.frames[index].image{
                                 Image(uiImage: image)
                                     .resizable()
@@ -570,6 +568,8 @@ struct ContentView: View {
                     }
                 }
             }
+            .scrollContentBackground(.hidden)
+            
         }
         .frame(height: 56)
     }

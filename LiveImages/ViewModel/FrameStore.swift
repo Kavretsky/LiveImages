@@ -56,9 +56,7 @@ final class FrameStore {
     }
     
     func addFrame() {
-        if currentFrameIndex + 1 == frames.count  {
-            frames.append(.init(name: "Frame \(frames.count + 1)"))
-        }
+        frames.append(.init(name: "Frame \(frames.count + 1)"))
         renderImage(for: currentFrameIndex)
         changeCurrentFrame(to: frames.endIndex - 1)
     }
@@ -152,6 +150,9 @@ final class FrameStore {
         undoManager.registerRedo(frameID: frames[currentFrameIndex].id) { [weak self] in
             self?.addPathWithUndo(path)
         }
+        if isFrameLineShowing {
+            renderImage(for: currentFrameIndex)
+        }
     }
     
     var canRedo: Bool {
@@ -210,12 +211,14 @@ final class FrameStore {
     
     //MARK: RenderImage
     private func renderImage(for index: Int) {
-        guard index >= 0, index < frames.count else { return }
+        guard index >= 0, index < frames.endIndex else { return }
         guard frames[index].image == nil || frames[index].didChanged else { return }
-        frames[index].image = nil
+        print(frames[index].didChanged)
+        print(frames[index].image == nil)
         if let pathNode = frames[index].pathHead, canvasSize != nil {
             Task {
                 frames[index].image = await createImage(for: pathNode, size: canvasSize!)
+                frames[index].didChanged = false
             }
         }
     }
@@ -475,6 +478,10 @@ final class FrameStore {
         undoManager.registerUndo(frameID: frames[currentFrameIndex].id, removePrevious: true) { [weak self] in
             self?.undoablyRemoveShape(newShape)
         }
+        frames[currentFrameIndex].didChanged = true
+        if isFrameLineShowing {
+            renderImage(for: currentFrameIndex)
+        }
     }
     
     private func undoablyAddShape<T: Drawable>(_ shape: T) {
@@ -482,12 +489,20 @@ final class FrameStore {
         undoManager.registerUndo(frameID: frames[currentFrameIndex].id) { [weak self] in
             self?.undoablyRemoveShape(shape)
         }
+        frames[currentFrameIndex].didChanged = true
+        if isFrameLineShowing {
+            renderImage(for: currentFrameIndex)
+        }
     }
     
     private func undoablyRemoveShape<T: Drawable>(_ shape: T) {
         removeShape(shape)
         undoManager.registerRedo(frameID: frames[currentFrameIndex].id) { [weak self] in
             self?.undoablyAddShape(shape)
+        }
+        frames[currentFrameIndex].didChanged = true
+        if isFrameLineShowing {
+            renderImage(for: currentFrameIndex)
         }
     }
     
@@ -514,6 +529,10 @@ final class FrameStore {
         undoManager.registerUndo(frameID: frames[currentFrameIndex].id, removePrevious: removeRedo) { [weak self] in
             self?.moveShapeBackWithRedo(shape, to: prevCenter)
         }
+        frames[currentFrameIndex].didChanged = true
+        if isFrameLineShowing {
+            renderImage(for: currentFrameIndex)
+        }
     }
     
     private func moveShapeBackWithRedo<T: Drawable>(_ shape: T, to point: CGPoint) {
@@ -521,6 +540,10 @@ final class FrameStore {
         shape.move(to: point)
         undoManager.registerRedo(frameID: frames[currentFrameIndex].id) { [weak self] in
             self?.moveShapeWithUndo(shape, to: prevCenter)
+        }
+        frames[currentFrameIndex].didChanged = true
+        if isFrameLineShowing {
+            renderImage(for: currentFrameIndex)
         }
     }
     
@@ -532,6 +555,10 @@ final class FrameStore {
         undoManager.registerUndo(frameID: frames[currentFrameIndex].id, removePrevious: removeRedo) { [weak self] in
             self?.scaleAndRotateShapeWithRedo(shape, scale: prevScale / shape.scaleValue, angle: prevAngle - shape.rotateAngle)
         }
+        frames[currentFrameIndex].didChanged = true
+        if isFrameLineShowing {
+            renderImage(for: currentFrameIndex)
+        }
     }
     
     private func scaleAndRotateShapeWithRedo<T: Drawable>(_ shape: T, scale: CGFloat, angle: Angle) {
@@ -541,6 +568,10 @@ final class FrameStore {
         shape.rotateAngle += angle
         undoManager.registerRedo(frameID: frames[currentFrameIndex].id) { [weak self] in
             self?.scaleAndRotateShapeWithUndo(shape, scale: prevScale / shape.scaleValue, angle: prevAngle - shape.rotateAngle)
+        }
+        frames[currentFrameIndex].didChanged = true
+        if isFrameLineShowing {
+            renderImage(for: currentFrameIndex)
         }
     }
 }
