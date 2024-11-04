@@ -36,13 +36,20 @@ struct ChangeColorView: View {
             
             
             ForEach(firstColors, id: \.self) { color in
-                Circle()
-                    .frame(width: 28, height: 28)
-                    .foregroundStyle(color)
-                    .padding(4)
-                    .onTapGesture {
-                        selectedColor = color
-                    }
+                Button {
+                    selectedColor = color
+                } label: {
+                    Circle()
+                        .frame(width: 28, height: 28)
+                        .foregroundStyle(color)
+                        .padding(4)
+                        .background(
+                            Circle()
+                                .frame(width: 32, height: 32)
+                                .foregroundStyle(selectedColor == color ? .accent : .clear)
+                        )
+                }
+                
             }
         }
         .padding(16)
@@ -57,13 +64,25 @@ struct ChangeColorView: View {
                     ForEach(0..<5) { index in
                         GridRow {
                             ForEach(paletteColors[index], id: \.self) { color in
-                                Circle()
-                                    .frame(width: 28, height: 28)
-                                    .foregroundStyle(color)
-                                    .padding(4)
-                                    .onTapGesture {
-                                        selectedColor = color
-                                    }
+                                Button {
+                                    selectedColor = color
+                                } label: {
+                                    Circle()
+                                        .frame(width: 28, height: 28)
+                                        .foregroundStyle(color)
+                                        .padding(4)
+                                        .background(
+                                            Circle()
+                                                .frame(width: 32, height: 32)
+                                                .foregroundStyle(selectedColor == color ? .accent : .clear)
+                                        )
+                                }
+                                
+//                                    .foregroundStyle(selectedColor == color ? .accent : .clear)
+////                                    .background(selectedColor == color ? .accent : .clear)
+//                                    .onTapGesture {
+//                                        
+//                                    }
                             }
                         }
                     }
