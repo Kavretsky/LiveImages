@@ -213,8 +213,6 @@ final class FrameStore {
     private func renderImage(for index: Int) {
         guard index >= 0, index < frames.endIndex else { return }
         guard frames[index].image == nil || frames[index].didChanged else { return }
-        print(frames[index].didChanged)
-        print(frames[index].image == nil)
         if let pathNode = frames[index].pathHead, canvasSize != nil {
             Task {
                 frames[index].image = await createImage(for: pathNode, size: canvasSize!)
