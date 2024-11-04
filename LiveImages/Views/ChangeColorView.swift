@@ -26,9 +26,9 @@ struct ChangeColorView: View {
     
     private var changeColorView: some View {
         HStack(spacing: 17) {
-            Image(.pallete)
+            Image(.palette)
                 .renderingMode(.template)
-                .foregroundStyle(showPalette ? .accent : .white)
+                .foregroundStyle(showPalette ? .accent : .buttonTint)
                 .frame(width: 32, height: 32)
                 .onTapGesture {
                     showPalette.toggle()

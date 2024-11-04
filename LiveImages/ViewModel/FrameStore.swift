@@ -177,7 +177,6 @@ final class FrameStore {
     private var timer: Timer = Timer()
     
     func startPlay() {
-        guard frames.count > 1 else { return }
         renderImage(for: currentFrameIndex)
         isPlaying = true
         timer.invalidate()
@@ -388,7 +387,6 @@ final class FrameStore {
         } catch let error {
             print(error.localizedDescription)
         }
-        
     }
     
     

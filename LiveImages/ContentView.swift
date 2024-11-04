@@ -39,12 +39,15 @@ struct ContentView: View {
     @State private var instrument: Instument = .none
     @State private var selectedColor: Color = .liveImagesBlue
     @State private var currentPath: [CGPoint] = []
-    @State private var image: Image?
     @State private var selectedShape: DrawableShape?
+    
+    init() {
+        UIView.appearance(whenContainedInInstancesOf: [UIAlertController.self]).tintColor = .accent
+    }
     
     var body: some View {
             ZStack {
-                Color(.origianlBlack)
+                Color(.background)
                     .ignoresSafeArea()
                 if frameStore.showProgress {
                     ProgressView()
@@ -130,13 +133,21 @@ struct ContentView: View {
             Button {
                 frameStore.undo()
             } label: {
-                Image(frameStore.canUndo ? .leftActive : .leftUnactive)
+                Image(.leftActive)
+                    .renderingMode(.template)
+                    .tint(.buttonTint)
+                    .opacity(frameStore.frames.count > 1 ? 1 : 0.5)
             }
+            .disabled(frameStore.canUndo)
             Button {
                 frameStore.redo()
             } label: {
-                Image(frameStore.canRedo ? .rightActive : .rightNotactive)
+                Image(.rightActive)
+                    .renderingMode(.template)
+                    .tint(.buttonTint)
+                    .opacity(frameStore.frames.count > 1 ? 1 : 0.5)
             }
+            .disabled(frameStore.canRedo)
         }
     }
     
@@ -146,18 +157,24 @@ struct ContentView: View {
                 frameStore.removeFrame()
             } label: {
                 Image(.bin)
+                    .renderingMode(.template)
+                    .tint(.buttonTint)
             }
             
             Button {
                 frameStore.addFrame()
             } label: {
                 Image(.filePlus)
+                    .renderingMode(.template)
+                    .tint(.buttonTint)
             }
             
             Button {
                 frameStore.toggleFrameLine()
             } label: {
                 Image(.layers)
+                    .renderingMode(.template)
+                    .tint(.buttonTint)
             }
             frameMenu
         }
@@ -217,6 +234,7 @@ struct ContentView: View {
                 } icon: {
                     Image(.removeAll)
                         .renderingMode(.template)
+                        .tint(.buttonTint)
                 }
             }
             
@@ -225,12 +243,12 @@ struct ContentView: View {
                 Image(systemName: "timelapse")
                     .symbolEffect(.pulse.byLayer, options: .repeating, isActive: frameStore.isGeneratingFrames)
                     .font(.title2)
-                    .foregroundStyle(.white)
+                    .foregroundStyle(.buttonTint)
                     .frame(width: 32, height: 32)
             } else {
                 Image(systemName: "ellipsis")
                     .font(.title2)
-                    .foregroundStyle(.white)
+                    .foregroundStyle(.buttonTint)
                     .frame(width: 32, height: 32)
             }
             
@@ -250,7 +268,9 @@ struct ContentView: View {
                     await frameStore.generateFrames(count: Int(frameCount) ?? 10)
                 }
             }
+            .tint(.buttonTint)
             Button("Cancel", role: .cancel) {}
+                .tint(.buttonTint)
         }
     }
     
@@ -260,14 +280,18 @@ struct ContentView: View {
                 Button {
                     frameStore.stopPlay()
                 } label: {
-                    Image(frameStore.isPlaying ? .pauseActive : .pauseUnactive)
+                    Image(.pauseActive)
+                        .renderingMode(.template)
+                        .tint(.buttonTint)
                 }
             }
             Button {
                 instrument = .none
                 frameStore.startPlay()
             } label: {
-                Image(frameStore.frames.count > 1 ? .playActive : .playUnactive)
+                Image(.playActive)
+                    .renderingMode(.template)
+                    .tint(.buttonTint)
             }
             
         }
@@ -471,7 +495,7 @@ struct ContentView: View {
             HStack(spacing: 16) {
                 Image(systemName: "scribble.variable")
                     .font(.system(size: 20))
-                    .foregroundStyle(instrument == .linewidth ? .accent : .white)
+                    .foregroundStyle(instrument == .linewidth ? .accent : .buttonTint)
                     .fontWeight(
                         fontWeight
                     )
@@ -481,7 +505,7 @@ struct ContentView: View {
                     }
                 Image(.pencil)
                     .renderingMode(.template)
-                    .foregroundStyle(instrument == .pen ? .accent : .white)
+                    .foregroundStyle(instrument == .pen ? .accent : .buttonTint)
                     .onTapGesture {
                         instrument = instrument == .pen ? .none : .pen
                     }
@@ -491,7 +515,7 @@ struct ContentView: View {
                 } label: {
                     Image(.brush)
                         .renderingMode(.template)
-                        .foregroundStyle(instrument == .brush ? .accent : .white)
+                        .foregroundStyle(instrument == .brush ? .accent : .buttonTint)
                         .frame(width: 32, height: 32)
                 }
                 
@@ -500,7 +524,7 @@ struct ContentView: View {
                 } label: {
                     Image(.erase)
                         .renderingMode(.template)
-                        .foregroundStyle(instrument == .eraser ? .accent : .white)
+                        .foregroundStyle(instrument == .eraser ? .accent : .buttonTint)
                         .frame(width: 32, height: 32)
                 }
                 
@@ -509,7 +533,7 @@ struct ContentView: View {
                 } label: {
                     Image(.instruments)
                         .renderingMode(.template)
-                        .foregroundStyle(instrument == .shapes ? .accent : .white)
+                        .foregroundStyle(instrument == .shapes ? .accent : .buttonTint)
                         .frame(width: 32, height: 32)
                 }
                 
@@ -518,7 +542,7 @@ struct ContentView: View {
                 } label: {
                     ZStack {
                         Circle()
-                            .foregroundStyle(instrument == .color ? .accent : .white)
+                            .foregroundStyle(instrument == .color ? .accent : .buttonTint)
                             .frame(width: 28, height: 28)
                         Circle()
                             .foregroundStyle(selectedColor)
@@ -538,7 +562,7 @@ struct ContentView: View {
             } label: {
                 Image(systemName: "xmark.circle")
                     .fontWidth(.expanded)
-                    .tint(.white)
+                    .tint(.buttonTint)
                     .font(.title)
             }
             .padding(.horizontal, 12)

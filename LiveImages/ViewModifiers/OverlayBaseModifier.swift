@@ -12,10 +12,10 @@ struct OverlayBaseModifier: ViewModifier {
         content
             .background(
                 RoundedRectangle(cornerRadius: 4, style: .continuous)
-                    .strokeBorder(.black.opacity(0.10), lineWidth: 1)
+                    .strokeBorder(.background.opacity(0.30), lineWidth: 1)
                     .background(
                         RoundedRectangle(cornerRadius: 4)
-                            .fill(Color.black.opacity(0.14))
+                            .fill(Color.background.opacity(0.14))
                             .blur(radius: 10)
                     )
                 
