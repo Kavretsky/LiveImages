@@ -10,13 +10,13 @@ import Observation
 import SwiftUI
 import UniformTypeIdentifiers
 
-@Observable
+
+@Observable @MainActor
 final class FrameStore {
     private(set) var frames: [DrawingFrame] = [.init(name: "Frame 1")]
     private let undoManager = MyUndoManager()
     private(set) var showProgress = false
     private(set) var currentFrameIndex = 0
-    
     var canvasSize: CGSize?
     
     var canvasAspectRation: Double {
@@ -27,11 +27,24 @@ final class FrameStore {
         }
     }
     
+    func receiveMemoryWarningNotification() {
+        for index in 0..<frames.count where abs(index - currentFrameIndex) > 100 {
+            frames[index].image = nil
+        }
+    }
+    
     //MARK: Frame intents
     func changeCurrentFrame(to index: Int) {
         guard index >= 0, index < frames.count, index != currentFrameIndex else { return }
         renderImage(for: currentFrameIndex)
         currentFrameIndex = index
+    }
+    
+    func changeCurrentFrame(to frame: DrawingFrame) {
+        if let index = frames.firstIndex(of: frame) {
+            renderImage(for: currentFrameIndex)
+            currentFrameIndex = index
+        }
     }
     
     func removeFrame() {
@@ -214,45 +227,60 @@ final class FrameStore {
         guard frames[index].image == nil || frames[index].didChanged else { return }
         if let pathNode = frames[index].pathHead, canvasSize != nil {
             Task {
-                frames[index].image = await createImage(for: pathNode, size: canvasSize!)
+                try Task.checkCancellation()
+                let image = await createImage(for: pathNode, size: canvasSize!)
+                frames[index].image = image
                 frames[index].didChanged = false
             }
         }
     }
-    
+    nonisolated
     private func createImage(for node: PathNode, size: CGSize) async -> UIImage {
         let renderer = UIGraphicsImageRenderer(size: size)
-        return renderer.image { ctx in
+        let image =  renderer.image { ctx in
             var context = ctx.cgContext
             context.setLineCap(.round)
             context.saveGState()
             context.translateBy(x: 0, y: size.height)
             context.scaleBy(x: 1, y: -1)
-            
+            if Task.isCancelled {
+                return
+            }
             if let image = UIImage(resource: .canvasBackground).cgImage {
                 context.draw(image, in: .init(origin: .zero, size: size), byTiling: false)
             }
             context.restoreGState()
-            self.drawPath(node, in: &context)
+            self.drawPath(node, in: &context, canvasSize: size)
+        }
+        if let data = image.jpegData(compressionQuality: 0.5), let compressedImage = UIImage(data: data) {
+            return compressedImage
+        } else {
+            return image
         }
     }
-    
-    private func drawPath(_ drawingPath: PathNode, in context: inout CGContext) {
+    nonisolated
+    private func drawPath(_ drawingPath: PathNode, in context: inout CGContext, canvasSize: CGSize) {
+        if Task.isCancelled {
+            return
+        }
         context.setLineJoin(.round)
         context.setLineCap(.round)
         context.setMiterLimit(0)
         if let toErase = drawingPath.erasePath {
             
-            let image = createInverseMask(from: toErase, size: canvasSize!, lineWidth: toErase.lineWidth)
+            let image = createInverseMask(from: toErase, size: canvasSize, lineWidth: toErase.lineWidth)
             context.setStrokeColor(UIColor(toErase.color).cgColor)
             context.setLineWidth(toErase.lineWidth)
-            context.clip(to: CGRect(origin: .zero, size: canvasSize!), mask: image.cgImage!)
+            context.clip(to: CGRect(origin: .zero, size: canvasSize), mask: image.cgImage!)
         }
         context.saveGState()
         
         if let next = drawingPath.next {
             var newContext = context
-            drawPath(next, in: &newContext)
+            drawPath(next, in: &newContext, canvasSize: canvasSize)
+        }
+        if Task.isCancelled {
+            return
         }
         context.restoreGState()
         if !drawingPath.shapes.isEmpty {
@@ -265,8 +293,11 @@ final class FrameStore {
         }
 
     }
-    
+    nonisolated
     private func drawPath(_ path: DrawingPath, in context: inout CGContext) {
+        if Task.isCancelled {
+            return
+        }
         if path.points.count != 1 {
             let currentDrawingPath = CGMutablePath()
             currentDrawingPath.addLines(between: path.points)
@@ -285,7 +316,7 @@ final class FrameStore {
             context.fillEllipse(in: ellipseRect)
         }
     }
-    
+    nonisolated
     private func createInverseMask(from path: DrawingPath, size: CGSize, lineWidth: CGFloat) -> UIImage {
         let renderer = UIGraphicsImageRenderer(size: size)
         
@@ -326,29 +357,46 @@ final class FrameStore {
         renderImage(for: index)
     }
     
+    func updateImage(for frameID: String) {
+        let task = Task(priority: .high) {
+            if let index = frames.firstIndex(where: { $0.id == frameID }) {
+                renderImage(for: index)
+            }
+        }
+        updateImageTasks[frameID] = task
+    }
+    
+    func cancelUpdateImage(for frameID: String) {
+        if let task = updateImageTasks[frameID] {
+            task.cancel()
+        }
+        updateImageTasks.removeValue(forKey: frameID)
+    }
+    
+    private var updateImageTasks = [String: Task<Void, Never>]()
     
     //MARK: GIF
     private(set) var gifURL: URL?
     private var createGifTask: Task<Void, Error>?
-    
+    private(set) var isCreatingGIF = false
     private enum CreateGifError: Error {
         case noCacheDirectory
         case noImageDestination
     }
     
-    
-    private func gifGenerator() async throws -> URL {
+    nonisolated
+    private func gifGenerator(images: [UIImage], framePerSecond: Double) async throws -> URL {
         guard let directory = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first else {
             throw CreateGifError.noCacheDirectory
         }
-        if let gifURL {
+        if let gifURL = await gifURL {
             try FileManager.default.removeItem(at: gifURL)
         }
         let fileName = "madeyourself.gif"
         let fileURL = directory.appendingPathComponent(fileName)
         let loopProperty = [kCGImagePropertyGIFDictionary : [
             kCGImagePropertyGIFLoopCount : 0]] as CFDictionary
-        guard let destination = CGImageDestinationCreateWithURL(fileURL as CFURL, UTType.gif.identifier as CFString, frames.count, nil) else {
+        guard let destination = CGImageDestinationCreateWithURL(fileURL as CFURL, UTType.gif.identifier as CFString, images.count, nil) else {
             throw CreateGifError.noImageDestination
         }
         
@@ -364,26 +412,39 @@ final class FrameStore {
         
         var index = 0
         
-        while index < frames.count  {
+        while index < images.count  {
             try Task.checkCancellation()
-            if let image = frames[index].image?.cgImage {
-                CGImageDestinationAddImage(destination, image, frameProperties)
-            }
+                if let image =  images[index].cgImage {
+                    CGImageDestinationAddImage(destination, image, frameProperties)
+                }
             index += 1
         }
         
         CGImageDestinationFinalize(destination)
-        
         return fileURL
     }
     
     func createGIF() async {
+        guard isCreatingGIF == false else { return }
         if createGifTask != nil {
             createGifTask?.cancel()
         }
+        isCreatingGIF = true
         renderImage(for: currentFrameIndex)
         do {
-            gifURL = try await gifGenerator()
+            var images: [UIImage] = []
+            for frame in frames {
+                if let image = frame.image {
+                    images.append(image)
+                } else {
+                    let image = await createImage(for: frame.pathHead!, size: canvasSize ?? .zero)
+                    images.append(image)
+                    
+                }
+            }
+            
+            gifURL = try await gifGenerator(images: images, framePerSecond: framePerSecond)
+            isCreatingGIF = false
         } catch let error {
             print(error.localizedDescription)
         }
@@ -395,27 +456,35 @@ final class FrameStore {
     
     func generateFrames(count: Int) async {
         guard !isGeneratingFrames else { return }
-        guard let canvasSize else { return }
         isGeneratingFrames = true
+        frames.append(contentsOf: await generate(count: count, canvasSize: canvasSize ?? .zero))
+        
+        isGeneratingFrames = false
+    }
+    nonisolated
+    private func generate(count: Int, canvasSize: CGSize) async -> [DrawingFrame] {
+        
+        
         var newFrames: [DrawingFrame] = []
-        await withTaskGroup(of: DrawingFrame.self) { [weak self] group in
+        await withTaskGroup(of: DrawingFrame?.self) { [weak self] group in
             for _ in 0..<count {
-                guard let self else { return }
+//                guard let self else { return }
                 group.addTask {
-                    return await self.generateFrame()
+                    return await self?.generateFrame(in: canvasSize)
                 }
                 
                 for await frame in group {
-                    newFrames.append(frame)
+                    if frame != nil {
+                        newFrames.append(frame!)
+                    }
                 }
             }
         }
         
-        await withTaskGroup(of: UIImage.self) { [weak self] group in
+        await withTaskGroup(of: UIImage?.self) { [weak self] group in
             for index in 0..<newFrames.count {
-                guard let self else { return }
                 group.addTask {
-                    return await self.createImage(for: newFrames[index].pathHead!, size: canvasSize)
+                    return await self?.createImage(for: newFrames[index].pathHead!, size: canvasSize)
                 }
                 
                 for await image in group {
@@ -423,23 +492,23 @@ final class FrameStore {
                 }
             }
         }
-        frames.append(contentsOf: newFrames)
         
-        isGeneratingFrames = false
+        return newFrames
     }
     
-    private func generateFrame() async -> DrawingFrame {
+    nonisolated
+    private func generateFrame(in canvasSize: CGSize) async -> DrawingFrame {
         var frame: DrawingFrame = .init(name: "generatedFrame")
         guard let path = frame.pathHead else { return frame }
         for _ in 0..<Int.random(in: 1...10) {
             let shape = DrawableShape.allCases.randomElement() ?? .circle
             let color = Color.randomColor()
-            let origin = CGPoint(x: .random(in: 0..<Int(canvasSize!.width) - 50) , y: .random(in: 0..<Int(canvasSize!.height) - 50))
+            let origin = CGPoint(x: .random(in: 0..<Int(canvasSize.width) - 50) , y: .random(in: 0..<Int(canvasSize.height) - 50))
             let scale: CGFloat = .random(in: 0.1..<5)
-            let height: CGFloat = .random(in: 50..<canvasSize!.height / scale)
-            let width: CGFloat = .random(in: 50..<canvasSize!.width / scale)
+            let height: CGFloat = .random(in: 50..<canvasSize.height / scale)
+            let width: CGFloat = .random(in: 50..<canvasSize.width / scale)
             let rotation: Angle = Angle(degrees: .random(in: 0..<360))
-            if let shape = createShape(shape, color: color, origin: origin, scaleValue: scale, rotateAngle: rotation, width: width, height: height) {
+            if let shape = createShape(shape, color: color, origin: origin, scaleValue: scale, rotateAngle: rotation, width: width, height: height, canvasSize: canvasSize) {
                 path.shapes.append(shape)
                 frame.appendPath(.init())
             }
@@ -469,7 +538,7 @@ final class FrameStore {
     }
     
     func undoablyAddShape(_ shape: DrawableShape, color: Color) {
-        guard let newShape = createShape(shape, color: color) else { return }
+        guard let newShape = createShape(shape, color: color, canvasSize: canvasSize ?? .zero) else { return }
         addShape(newShape)
         undoManager.registerUndo(frameID: frames[currentFrameIndex].id, removePrevious: true) { [weak self] in
             self?.undoablyRemoveShape(newShape)
@@ -501,9 +570,8 @@ final class FrameStore {
             renderImage(for: currentFrameIndex)
         }
     }
-    
-    private func createShape(_ shape: DrawableShape, color: Color, origin: CGPoint = .zero, scaleValue: CGFloat = 1, rotateAngle: Angle = .zero, width: CGFloat = 80, height: CGFloat = 80) -> (any Drawable)? {
-        guard let canvasSize else { return nil }
+    nonisolated
+    private func createShape(_ shape: DrawableShape, color: Color, origin: CGPoint = .zero, scaleValue: CGFloat = 1, rotateAngle: Angle = .zero, width: CGFloat = 80, height: CGFloat = 80, canvasSize: CGSize) -> (any Drawable)? {
         var origin = origin
         if origin == .zero {
             origin = CGPoint(x: canvasSize.width / 2 - width / 2, y: canvasSize.height / 2 - height / 2)

@@ -223,8 +223,8 @@ struct ContentView: View {
                     Image(systemName: "photo.on.rectangle.angled")
                 }
             }
-            if let gifURL = frameStore.gifURL, let image = frameStore.frames.first?.image {
-                ShareLink(item: gifURL, preview: SharePreview("madeyourself.gif", image: Image(uiImage: image)))
+            if let gifURL = frameStore.gifURL {
+                ShareLink(item: gifURL, preview: SharePreview("madeyourself.gif", image: Image(uiImage: frameStore.frames.first?.image ?? .canvasBackground)))
             }
             
             Divider()
@@ -387,7 +387,6 @@ struct ContentView: View {
                         frameStore.updateImage(for: frameStore.animationFrameIndex)
                     }
             }
-            
         }
         .clipShape(RoundedRectangle(cornerRadius: 20))
     }
@@ -523,14 +522,14 @@ struct ContentView: View {
                         .frame(width: 32, height: 32)
                 }
                 
-                Button {
-                    instrument = instrument == .brush ? .none : .brush
-                } label: {
-                    Image(.brush)
-                        .renderingMode(.template)
-                        .foregroundStyle(instrument == .brush ? .accent : .buttonTint)
-                        .frame(width: 32, height: 32)
-                }
+//                Button {
+//                    instrument = instrument == .brush ? .none : .brush
+//                } label: {
+//                    Image(.brush)
+//                        .renderingMode(.template)
+//                        .foregroundStyle(instrument == .brush ? .accent : .buttonTint)
+//                        .frame(width: 32, height: 32)
+//                }
                 
                 Button {
                     instrument = instrument == .eraser ? .none : .eraser
@@ -581,9 +580,9 @@ struct ContentView: View {
             .padding(.horizontal, 12)
             ScrollView(.horizontal) {
                 LazyHStack(spacing: 3) {
-                    ForEach(0..<frameStore.frames.count, id: \.self) { index in
+                    ForEach(frameStore.frames) { frame in
                         ZStack {
-                            if let image = frameStore.frames[index].image{
+                            if let image = frame.image{
                                 Image(uiImage: image)
                                     .resizable()
                                     .frame(width: 56 * frameStore.canvasAspectRation, height: 56)
@@ -592,15 +591,21 @@ struct ContentView: View {
                                     .resizable()
                                     .frame(width: 56 * frameStore.canvasAspectRation, height: 56)
                                 ProgressView()
-                                    .onAppear {
-                                        frameStore.updateImage(for: index)
+                                    .task {
+                                        frameStore.updateImage(for: frame.id)
+                                    }
+                                    .onDisappear {
+                                        frameStore.cancelUpdateImage(for: frame.id)
                                     }
                             }
                         }
-                        .border(.accent, width: index == frameStore.currentFrameIndex ? 2 : 0)
+                        .onDisappear {
+                            frameStore.cancelUpdateImage(for: frame.id)
+                        }
+                        .border(.accent, width: frame.id == frameStore.frames[frameStore.currentFrameIndex].id ? 2 : 0)
                         .clipShape(RoundedRectangle(cornerRadius: 2))
                         .onTapGesture {
-                            frameStore.changeCurrentFrame(to: index)
+                            frameStore.changeCurrentFrame(to: frame)
                         }
                     }
                 }
